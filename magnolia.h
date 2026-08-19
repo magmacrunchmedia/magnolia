@@ -1,5 +1,5 @@
-#ifndef MAGMANOLIA_H
-#define MAGMANOLIA_H
+#ifndef MAGNOLIA_H
+#define MAGNOLIA_H
 
 #include <grrlib.h>
 
