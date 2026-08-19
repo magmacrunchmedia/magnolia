@@ -33,122 +33,102 @@ LIBS        := -lgrrlib -lpngu -lfreetype -lpng -ljpeg -lz -lbrotlidec -lbrotlic
 #include "magnolia.h"
 
 int main(void) {
-    renderer_init();      // Sets up GRRLIB, loads Press Start 2P font
-    input_init();         // Initializes Wiimote
-    scoring_init();       // Loads high scores from SD card
-    stars_init();         // Generates starfield
-    characters_init();    // Initializes character selector
+    const MagnoliaConfig cfg = {
+        .app_name     = "my-game",   /* -> sd:/apps/my-game/ */
+        .max_scores   = 10,
+        .overscan_pct = 6
+    };
+
+    /* Brings up SD, video, font, UI metrics and scoring in the right order.
+       A non-zero return means the engine is usable but degraded -- check
+       magnolia_sd_mounted() / magnolia_fonts_loaded() and tell the player,
+       rather than silently rendering placeholder art. */
+    int status = magnolia_init(&cfg);
+    input_init();
+
+    GameStateMachine gs;
+    gamestate_init(&gs);
 
     while (1) {
         input_scan();
-        stars_update();
+        if (input_home_pressed()) break;
+
+        if (gamestate_current(&gs) == GS_PLAYING) {
+            /* your game */
+        } else if (gamestate_update(&gs, score)) {
+            /* just entered GS_PLAYING -- reset your world */
+        }
 
         renderer_draw_background();
-        renderer_draw_stars();
-        renderer_draw_player(&player, thrust_active);
-        renderer_draw_score(scoring_get());
-        renderer_finish();  // Flip buffers
+        renderer_finish();
     }
+
+    magnolia_shutdown();
+    return 0;
 }
 ```
+
+### 4. Verify the engine still stands alone
+
+```bash
+cd magnolia && make      # builds libmagnolia.a
+```
+
+This compiles the engine with **no game directory on the include path**. It is
+not how games consume magnolia -- they build the sources directly -- but if
+engine code ever reaches back into a game header, this build fails immediately
+instead of the coupling surfacing in the next game months later. Run it before
+committing engine changes.
+
+## Design rule
+
+magnolia holds what more than one game needs. Anything shaped by a single game
+belongs in that game. Concretely: sprite loading and the origin concept are
+engine; a particular character roster is not. A high-score table is engine; a
+jetman's gravity is not. When something looks reusable but has exactly one
+consumer, leave it in the game until a second one appears -- an abstraction
+designed against one example usually fits only that example.
 
 ## Engine Modules
 
 | Module | Header | Description |
 |--------|--------|-------------|
-| **renderer** | `renderer.h` | GRRLIB init, sprite loading, TTF font rendering, frame flush |
-| **input** | `input.h` | Wiimote input wrapper (buttons, D-pad) |
-| **scoring** | `scoring.h` | High score manager with SD card JSON persistence |
-| **stars** | `stars.h` | Twinkling starfield background (60 stars, blink/pulse) |
-| **theme** | `theme.h` | HSL→RGB color palette generator (3-color harmonious themes) |
-| **player** | `player.h` | Generic physics entity (thrust, gravity, velocity, boundary) |
-| **characters** | `characters.h` | Character registry with selection, hitbox, and physics |
-| **ui_utils** | `ui_utils.h` | Text shadow, centered text, screen border drawing |
+| **core** | `core.h` | `magnolia_init()` bring-up, init status, SD asset paths |
+| **renderer** | `renderer.h` | GRRLIB init, TTF font, real video-mode geometry, frame flush |
+| **sprite** | `sprite.h` | Texture load/free and draw-at-origin |
+| **input** | `input.h` | Wiimote button/D-pad wrapper |
+| **audio** | `audio.h` | PCM16 music loop + SFX over ASND |
+| **scoring** | `scoring.h` | High-score table with SD JSON persistence |
+| **gamestate** | `gamestate.h` | Score-attack shell and initials editor |
+| **theme** | `theme.h` | HSL→RGB palette generator, complementary colours |
+| **ui_utils** | `ui_utils.h` | Design-space → TV-safe layout, text, border |
 
-## API Reference
+### Not in the engine, by design
 
-### renderer
+`player`, `stars` and `characters` used to live here and now belong to
+Moonlight Drift. They encoded one game's decisions — jetman physics, a specific
+starfield, a fixed character roster — and forced the engine to depend on that
+game's `config.h`. If a second game needs something similar, generalise it then,
+against two real examples.
 
-```c
-void renderer_init(void);                              // Init GRRLIB + load font
-void renderer_load_sprites(const CharacterData *ch);   // Load character textures
-void renderer_draw_background(void);                   // Clear to black
-void renderer_draw_stars(void);                        // Draw starfield
-void renderer_draw_player(const Player *p, int thrust); // Draw sprite or rectangle
-void renderer_draw_score(int score);                   // Draw score with TTF
-void renderer_draw_character_name(const char *name);   // Draw name text
-void renderer_finish(void);                            // Flip framebuffers
+### Screen geometry
+
+Never hardcode 640×480. `renderer_screen_width()`/`_height()` report the running
+video mode (NTSC 640×480, PAL 640×528). UI should be authored in the fixed
+`UI_DESIGN_WIDTH`×`UI_DESIGN_HEIGHT` design space and drawn through the
+`ui_map_*` helpers, which project it into the TV-safe area — consumer sets clip
+roughly 5–10% of every edge.
+
+### Audio format
+
+Assets are raw signed 16-bit little-endian stereo at 48kHz:
+
+```bash
+ffmpeg -i in.ogg -f s16le -acodec pcm_s16le -ar 48000 -ac 2 out.pcm
 ```
 
-### input
-
-```c
-void input_init(void);
-int  input_scan(void);           // Call each frame
-int  input_thrust_pressed(void); // A button held
-int  input_start_pressed(void);  // A button pressed
-int  input_home_pressed(void);   // HOME button
-int  input_left_pressed(void);   // D-pad left
-int  input_right_pressed(void);  // D-pad right
-```
-
-### scoring
-
-```c
-void scoring_init(void);                          // Load from SD card
-void scoring_reset(void);                         // Reset session score
-int  scoring_get(void);                           // Current score
-void scoring_increment(void);                     // Score +1
-int  scoring_add_entry(const char *initials, int score); // Add high score
-int  scoring_get_count(void);                     // Number of entries
-const ScoreEntry *scoring_get_entry(int index);   // Get by index
-int  scoring_is_high_score(int score);            // Does it qualify?
-int  scoring_get_rank(int score);                 // Placement rank
-```
-
-### player
-
-```c
-void player_init(Player *p);
-void player_set_physics(Player *p, float thrust, float gravity, float maxVel);
-void player_set_hitbox(Player *p, int w, int h, int ox, int oy);
-int  player_update(Player *p, int thrust_active, int canvas_height); // Returns 1 on boundary hit
-```
-
-### characters
-
-```c
-void characters_init(void);
-const CharacterData *characters_get_current(void);
-void characters_set_current(int index);
-int  characters_get_current_index(void);
-int  characters_get_count(void);
-const CharacterData *characters_get_by_index(int index);
-```
-
-### ui_utils
-
-```c
-void ui_draw_text_shadow(int x, int y, const char *text, unsigned int size, u32 color);
-void ui_draw_centered_text(int y, const char *text, unsigned int size, u32 color);
-void ui_draw_border(void);  // Cyan border around screen
-```
-
-### stars
-
-```c
-void stars_init(void);
-void stars_update(void);
-void stars_get(int index, Star **out);
-int  stars_get_count(void);
-```
-
-### theme
-
-```c
-ThemeColor theme_hsl_to_rgb(float h, float s, float l);
-void theme_generate(Theme *t);  // Random 3-color palette
-```
+Clips are held in main RAM — budget ~192KB per second of audio against the
+Wii's 24MB, and trim long tracks rather than streaming them.
 
 ## Dependencies
 
@@ -159,6 +139,7 @@ void theme_generate(Theme *t);  // Random 3-color palette
 | libogc | Bundled with devkitPro |
 | ppc-libpng, ppc-freetype, ppc-libjpeg-turbo | `dkp-pacman` |
 | libfat-ogc | `dkp-pacman` |
+| libasnd (audio) | Bundled with devkitPro |
 
 ## Font
 
