@@ -26,4 +26,9 @@ int  sprite_height(const Sprite *s);
 void sprite_draw(const Sprite *s, float x, float y);
 void sprite_draw_tinted(const Sprite *s, float x, float y, u32 tint);
 
+/* Same placement rule, scaled about the origin -- so a sprite drawn at half
+   size still has its origin land exactly on (x, y). For thumbnail grids. */
+void sprite_draw_scaled(const Sprite *s, float x, float y, float scale);
+void sprite_draw_scaled_tinted(const Sprite *s, float x, float y, float scale, u32 tint);
+
 #endif

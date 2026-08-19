@@ -95,7 +95,7 @@ designed against one example usually fits only that example.
 |--------|--------|-------------|
 | **core** | `core.h` | `magnolia_init()` bring-up, init status, SD asset paths |
 | **renderer** | `renderer.h` | GRRLIB init, TTF font, real video-mode geometry, frame flush |
-| **sprite** | `sprite.h` | Texture load/free and draw-at-origin |
+| **sprite** | `sprite.h` | Texture load/free, draw-at-origin, scaled draw |
 | **input** | `input.h` | Wiimote button/D-pad wrapper |
 | **audio** | `audio.h` | PCM16 music loop + SFX over ASND |
 | **scoring** | `scoring.h` | High-score table with SD JSON persistence |
