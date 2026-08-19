@@ -1,12 +1,17 @@
 #ifndef SCORING_H
 #define SCORING_H
 
+#include "core.h"
+
 typedef struct {
     char initials[4];
     int score;
 } ScoreEntry;
 
-void scoring_init(void);
+/* path: where the table persists (an sd:/ path). max_entries is clamped to
+   MAGNOLIA_MAX_SCORES. Loads any existing table. Normally called for you by
+   magnolia_init(). */
+void scoring_init(const char *path, int max_entries);
 void scoring_reset(void);
 int scoring_get(void);
 void scoring_increment(void);

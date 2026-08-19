@@ -2,13 +2,21 @@
 #include <string.h>
 #include <stdlib.h>
 #include "scoring.h"
-#include "config.h"
 
 static int current_score = 0;
-static ScoreEntry scores[MAX_SCORES];
+static ScoreEntry scores[MAGNOLIA_MAX_SCORES];
 static int score_count = 0;
+static int max_scores = MAGNOLIA_MAX_SCORES;
+static char scores_path[160] = "";
 
-void scoring_init(void) {
+void scoring_init(const char *path, int max_entries) {
+    if (path) {
+        strncpy(scores_path, path, sizeof(scores_path) - 1);
+        scores_path[sizeof(scores_path) - 1] = '\0';
+    }
+    max_scores = (max_entries > 0 && max_entries < MAGNOLIA_MAX_SCORES)
+               ? max_entries : MAGNOLIA_MAX_SCORES;
+    score_count = 0;
     scoring_load();
 }
 
@@ -35,10 +43,10 @@ int scoring_add_entry(const char *initials, int score) {
         }
     }
 
-    if (rank >= MAX_SCORES) return -1;
+    if (rank >= max_scores) return -1;
 
     for (int i = score_count; i > rank; i--) {
-        if (i < MAX_SCORES) {
+        if (i < max_scores) {
             scores[i] = scores[i - 1];
         }
     }
@@ -47,7 +55,7 @@ int scoring_add_entry(const char *initials, int score) {
     scores[rank].initials[3] = '\0';
     scores[rank].score = score;
 
-    if (score_count < MAX_SCORES) score_count++;
+    if (score_count < max_scores) score_count++;
 
     scoring_save();
     return rank;
@@ -65,11 +73,11 @@ const ScoreEntry *scoring_get_entry(int index) {
 }
 
 void scoring_save(void) {
-    FILE *f = fopen(SCORES_PATH, "w");
+    FILE *f = fopen(scores_path, "w");
     if (!f) return;
 
     fprintf(f, "{\"scores\":[");
-    int count = score_count < MAX_SCORES ? score_count : MAX_SCORES;
+    int count = score_count < max_scores ? score_count : max_scores;
     for (int i = 0; i < count; i++) {
         if (i > 0) fprintf(f, ",");
         fprintf(f, "{\"initials\":\"%s\",\"score\":%d}", scores[i].initials, scores[i].score);
@@ -79,7 +87,7 @@ void scoring_save(void) {
 }
 
 int scoring_load(void) {
-    FILE *f = fopen(SCORES_PATH, "r");
+    FILE *f = fopen(scores_path, "r");
     if (!f) {
         score_count = 0;
         return 0;
@@ -108,7 +116,7 @@ int scoring_load(void) {
     score_count = 0;
     char *p = buf;
     char *end = buf + size;
-    while ((p = strstr(p, "\"initials\":")) != NULL && score_count < MAX_SCORES) {
+    while ((p = strstr(p, "\"initials\":")) != NULL && score_count < max_scores) {
         if (p + 11 >= end) break;
         p += 11;
         while (*p == '"' && p < end) p++;
@@ -138,7 +146,7 @@ int scoring_load(void) {
 
 int scoring_is_high_score(int score) {
     if (score <= 0) return 0;
-    if (score_count < MAX_SCORES) return 1;
+    if (score_count < max_scores) return 1;
     return score > scores[score_count - 1].score;
 }
 
