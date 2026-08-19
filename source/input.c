@@ -49,3 +49,13 @@ int input_back_pressed(void) {
     u32 pressed = WPAD_ButtonsDown(0);
     return (pressed & WPAD_BUTTON_B) != 0;
 }
+
+int input_button1_pressed(void) {
+    u32 pressed = WPAD_ButtonsDown(0);
+    return (pressed & WPAD_BUTTON_1) != 0;
+}
+
+int input_button2_pressed(void) {
+    u32 pressed = WPAD_ButtonsDown(0);
+    return (pressed & WPAD_BUTTON_2) != 0;
+}

@@ -11,5 +11,7 @@ int input_right_pressed(void);
 int input_up_pressed(void);
 int input_down_pressed(void);
 int input_back_pressed(void);
+int input_button1_pressed(void);
+int input_button2_pressed(void);
 
 #endif
