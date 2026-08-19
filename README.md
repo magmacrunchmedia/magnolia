@@ -166,4 +166,4 @@ Includes **Press Start 2P** by [CodeMan38](https://fonts.google.com/specimen/Pre
 
 ## License
 
-LGPL-2.1 — same as GRRLIB.
+Apache 2.0 — same as adenosine.

@@ -34,3 +34,18 @@ int input_right_pressed(void) {
     u32 pressed = WPAD_ButtonsDown(0);
     return (pressed & WPAD_BUTTON_RIGHT) != 0;
 }
+
+int input_up_pressed(void) {
+    u32 pressed = WPAD_ButtonsDown(0);
+    return (pressed & WPAD_BUTTON_UP) != 0;
+}
+
+int input_down_pressed(void) {
+    u32 pressed = WPAD_ButtonsDown(0);
+    return (pressed & WPAD_BUTTON_DOWN) != 0;
+}
+
+int input_back_pressed(void) {
+    u32 pressed = WPAD_ButtonsDown(0);
+    return (pressed & WPAD_BUTTON_B) != 0;
+}

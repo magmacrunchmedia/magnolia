@@ -96,26 +96,39 @@ int scoring_load(void) {
     }
 
     char *buf = (char *)malloc(size + 1);
+    if (!buf) {
+        fclose(f);
+        score_count = 0;
+        return 0;
+    }
     fread(buf, 1, size, f);
     buf[size] = '\0';
     fclose(f);
 
     score_count = 0;
     char *p = buf;
+    char *end = buf + size;
     while ((p = strstr(p, "\"initials\":")) != NULL && score_count < MAX_SCORES) {
+        if (p + 11 >= end) break;
         p += 11;
-        while (*p == '"') p++;
+        while (*p == '"' && p < end) p++;
         int len = 0;
-        while (p[len] != '"' && len < 3) len++;
-        memcpy(scores[score_count].initials, p, len);
-        scores[score_count].initials[len] = '\0';
+        while (p + len < end && p[len] != '"' && len < 3) len++;
+        if (len > 0 && len <= 3) {
+            memcpy(scores[score_count].initials, p, len);
+            scores[score_count].initials[len] = '\0';
+        } else {
+            strcpy(scores[score_count].initials, "???");
+        }
         p += len;
 
         p = strstr(p, "\"score\":");
-        if (p) {
+        if (p && p + 8 < end) {
             p += 8;
             scores[score_count].score = atoi(p);
             score_count++;
+        } else {
+            break;
         }
     }
 

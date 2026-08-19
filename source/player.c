@@ -39,16 +39,11 @@ int player_update(Player *p, int thrust_active, int canvas_height) {
 
     p->y += p->velocity;
 
-    if (p->y < 0) {
-        p->y = 0;
-        p->velocity = 0;
-        return 1;
-    }
-    if (p->y + p->height > canvas_height) {
-        p->y = canvas_height - p->height;
-        p->velocity = 0;
-        return 1;
-    }
+    /* Boundary death is measured against the hitbox, not the sprite box, so a
+       character whose art sits off its origin does not die early. Matches
+       updatePlayer() in the source game's js/player.js. */
+    if (p->y + p->offsetY < 0) return 1;
+    if (p->y + p->offsetY + p->height > canvas_height) return 1;
 
     return 0;
 }

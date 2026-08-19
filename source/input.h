@@ -8,5 +8,8 @@ int input_home_pressed(void);
 int input_start_pressed(void);
 int input_left_pressed(void);
 int input_right_pressed(void);
+int input_up_pressed(void);
+int input_down_pressed(void);
+int input_back_pressed(void);
 
 #endif

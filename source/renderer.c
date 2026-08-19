@@ -1,5 +1,6 @@
 #include <grrlib.h>
 #include <math.h>
+#include <fat.h>
 #include "renderer.h"
 #include "stars.h"
 #include "characters.h"
@@ -10,14 +11,49 @@ GRRLIB_ttfFont *ttf_font = NULL;
 static GRRLIB_texImg *tex_idle = NULL;
 static GRRLIB_texImg *tex_thrust = NULL;
 static int sprites_loaded = 0;
+static int sd_mounted = 0;
 
 static u32 make_color(u8 r, u8 g, u8 b, u8 a) {
     return RGBA(r, g, b, a);
 }
 
-void renderer_init(void) {
-    GRRLIB_Init();
+int renderer_init(void) {
+    int status = 0;
+
+    /* Must happen before any sd:/ path is opened. Without it every
+       GRRLIB_LoadTextureFromFile() call silently returns NULL and the game
+       falls back to placeholder rectangles. */
+    sd_mounted = fatInitDefault() ? 1 : 0;
+    if (!sd_mounted) status = -1;
+
+    if (GRRLIB_Init() < 0) return -2;
+
     ttf_font = GRRLIB_LoadTTF(PressStart2P, PressStart2P_size);
+    if (!ttf_font) status = -3;
+
+    return status;
+}
+
+void renderer_shutdown(void) {
+    if (tex_idle)   { GRRLIB_FreeTexture(tex_idle);   tex_idle = NULL; }
+    if (tex_thrust) { GRRLIB_FreeTexture(tex_thrust); tex_thrust = NULL; }
+    sprites_loaded = 0;
+    if (ttf_font) { GRRLIB_FreeTTF(ttf_font); ttf_font = NULL; }
+    GRRLIB_Exit();
+}
+
+int renderer_sd_mounted(void) { return sd_mounted; }
+int renderer_fonts_loaded(void) { return ttf_font != NULL; }
+int renderer_sprites_loaded(void) { return sprites_loaded; }
+
+int renderer_screen_width(void) {
+    extern GXRModeObj *rmode;
+    return rmode ? rmode->fbWidth : 640;
+}
+
+int renderer_screen_height(void) {
+    extern GXRModeObj *rmode;
+    return rmode ? rmode->efbHeight : 480;
 }
 
 void renderer_load_sprites(const CharacterData *ch) {
@@ -36,6 +72,15 @@ void renderer_load_sprites(const CharacterData *ch) {
 
 void renderer_draw_background(void) {
     GRRLIB_FillScreen(0x000000FF);
+
+    /* Cyan rules on the lethal top/bottom edges, as drawBackground() does in
+       js/renderer.js. On a TV these also tell the player where the invisible
+       kill boundary actually is once overscan eats the outer rows. */
+    int w = renderer_screen_width();
+    int h = renderer_screen_height();
+    u32 edge = RGBA(0, 212, 255, 77);
+    GRRLIB_Rectangle(0, 0, (f32)w, 2, edge, true);
+    GRRLIB_Rectangle(0, (f32)(h - 2), (f32)w, 2, edge, true);
 }
 
 void renderer_draw_stars(void) {
@@ -62,8 +107,11 @@ void renderer_draw_player(const Player *p, int thrust_active) {
     if (sprites_loaded && tex_idle && tex_thrust) {
         GRRLIB_texImg *tex = thrust_active ? tex_thrust : tex_idle;
         const CharacterData *ch = characters_get_current();
-        float dx = p->x - (tex->w - ch->hitbox_w) / 2.0f;
-        float dy = p->y - (tex->h - ch->hitbox_h) / 2.0f;
+        /* The sprite was exported with the character's local (0,0) landing at
+           sprite_origin_*, and hitbox offsets are relative to that same origin,
+           so placing the origin at the player position keeps art and hitbox aligned. */
+        float dx = p->x - (float)ch->sprite_origin_x;
+        float dy = p->y - (float)ch->sprite_origin_y;
         GRRLIB_DrawImg(dx, dy, tex, 0, 1, 1, RGBA(255, 255, 255, 255));
     } else {
         u32 white = RGBA(255, 255, 255, 255);
@@ -89,6 +137,7 @@ void renderer_draw_score(int score) {
         }
     }
     buf[len] = '\0';
+    if (!ttf_font) return;
     GRRLIB_PrintfTTF(20, 10, ttf_font, "SCORE:", 14, RGBA(255, 255, 255, 255));
     GRRLIB_PrintfTTF(120, 10, ttf_font, buf, 14, RGBA(255, 255, 255, 255));
 }

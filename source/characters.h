@@ -10,6 +10,11 @@ typedef struct {
     int hitbox_h;
     int hitbox_offset_x;
     int hitbox_offset_y;
+    /* Where the character's local (0,0) drawing origin sits inside its sprite PNG.
+       Recovered empirically per character by re-rendering the source draw() call and
+       diffing against the exported PNG -- it is not a fixed value. */
+    int sprite_origin_x;
+    int sprite_origin_y;
     float thrust;
     float gravity;
     float maxVelocity;
