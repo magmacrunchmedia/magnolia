@@ -17,6 +17,11 @@ int  renderer_screen_height(void);
 void renderer_draw_background(void);
 void renderer_finish(void);
 
+/* One-line status frame, drawn and flipped immediately. Used during bring-up,
+   before the UI layer exists, so a slow or wedged init step says so on screen
+   instead of leaving an unconfigured framebuffer. */
+void renderer_splash(const char *line1, const char *line2);
+
 extern GRRLIB_ttfFont *ttf_font;
 
 #endif

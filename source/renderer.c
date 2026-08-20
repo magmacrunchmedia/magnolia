@@ -36,3 +36,21 @@ void renderer_draw_background(void) {
 void renderer_finish(void) {
     GRRLIB_Render();
 }
+
+void renderer_splash(const char *line1, const char *line2) {
+    GRRLIB_FillScreen(0x000000FF);
+    if (ttf_font) {
+        int w = renderer_screen_width();
+        if (line1) {
+            u32 tw = GRRLIB_WidthTTF(ttf_font, line1, 16);
+            GRRLIB_PrintfTTF((w - (int)tw) / 2, 200, ttf_font, line1, 16,
+                             RGBA(0, 212, 255, 255));
+        }
+        if (line2) {
+            u32 tw = GRRLIB_WidthTTF(ttf_font, line2, 12);
+            GRRLIB_PrintfTTF((w - (int)tw) / 2, 240, ttf_font, line2, 12,
+                             RGBA(160, 160, 160, 255));
+        }
+    }
+    GRRLIB_Render();
+}

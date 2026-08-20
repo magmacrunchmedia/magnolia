@@ -107,6 +107,8 @@ int audio_play_music(const char *path) {
     return 1;
 }
 
+int audio_music_loaded(void) { return music.data != NULL; }
+
 void audio_stop_music(void) {
     if (!initialised) return;
     if (music_voice >= 0) {

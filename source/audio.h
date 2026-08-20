@@ -25,6 +25,8 @@ void audio_play_sfx(int slot);
 
 /* Loads and starts a looping track, replacing any current one. */
 int  audio_play_music(const char *path);
+/* Whether a music track is currently loaded in memory. */
+int  audio_music_loaded(void);
 void audio_stop_music(void);
 
 /* Muting is remembered across calls, so a track started while muted stays
