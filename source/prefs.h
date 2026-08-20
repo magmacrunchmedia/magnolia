@@ -17,8 +17,14 @@
 #define MAGNOLIA_MAX_PREFS    16
 #define MAGNOLIA_PREF_KEY_MAX 24
 
-/* path: an sd:/ path. Loads any existing file. Normally called by magnolia_init(),
-   which points it at sd:/apps/<app_name>/settings.json. */
+/* path: an sd:/ path. Loads any existing file, then writes it straight back.
+   Normally called by magnolia_init(), which points it at
+   sd:/apps/<app_name>/settings.json.
+
+   The write-back is deliberate. It costs one tiny file per boot and it buys a
+   real answer from prefs_persisted() immediately, instead of after whenever the
+   player next happens to change a setting -- which is how a card that refuses
+   every write went unnoticed for as long as it did. */
 void prefs_init(const char *path);
 
 /* `fallback` is returned when the key was never set, when the card is absent, and
@@ -33,7 +39,11 @@ void prefs_save(void);
 int  prefs_load(void);
 
 /* Whether the last save reached the card. Lets a game tell the player their
-   settings are not being kept, rather than appearing to forget them at random. */
+   settings are not being kept, rather than appearing to forget them at random.
+
+   Answers for the current card from prefs_init() onwards, because that probes
+   with a real write. Reading the file successfully is not evidence that writing
+   works, so a successful load does not set this. */
 int  prefs_persisted(void);
 
 #endif

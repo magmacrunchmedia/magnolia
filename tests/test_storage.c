@@ -59,6 +59,66 @@ static void test_prefs(void) {
     check(!prefs_persisted(), "failed write is reported, not silently swallowed");
 }
 
+/* Whether a write reached the card, for both stores.
+ *
+ * This is the question commit 25670ea was really about. Every score and
+ * preference write was failing because nothing had created sd:/apps/<app>/, and
+ * it hid for as long as it did because nothing reported it: prefs_persisted()
+ * was the only signal, and scoring had no equivalent at all.
+ *
+ * An unwritable path here is a directory that is not there -- the same shape as
+ * the real failure, and no permissions games needed to produce it.
+ */
+static const char *NO_DIR_PREFS  = "/nonexistent-dir/settings.json";
+static const char *NO_DIR_SCORES = "/nonexistent-dir/scores.json";
+
+static void test_persistence_reporting(void) {
+    printf("storage: whether the last write reached the card\n");
+    cleanup();
+
+    /* A healthy card with no settings file yet is what every fresh install
+       looks like, and it used to report failure -- prefs_init() zeroed the flag
+       and prefs_load() returned early without ever touching it. A game
+       surfacing that would have told every new player their settings were not
+       being kept. prefs_init() now probes with a real write. */
+    prefs_init(PREFS);
+    check(prefs_persisted(), "a fresh card reports saving, with no set() call");
+    check_int(prefs_get_int("anything", 4), 4, "and the fallback still answers");
+
+    prefs_set_int("music", 1);
+    check(prefs_persisted(), "and still reports saving after a real write");
+
+    prefs_init(NO_DIR_PREFS);
+    check(!prefs_persisted(), "a missing directory reports not saving");
+
+    /* The flag must recover rather than latch: a game that reports a save
+       failure forever after one bad card is its own kind of wrong. */
+    prefs_init(PREFS);
+    check(prefs_persisted(), "a working path clears the earlier failure");
+
+    /* scoring can now answer the same question. Before this, a failed fopen in
+       scoring_save() was dropped on the floor, so a leaderboard that reset on
+       every power cycle looked exactly like one nobody had qualified for. */
+    cleanup();
+    scoring_init(SCORES, 10);
+    check(scoring_persisted(), "nothing has failed before the first save");
+
+    scoring_add_entry("ABC", 100);
+    check(scoring_persisted(), "a save to a good path reports success");
+
+    scoring_init(NO_DIR_SCORES, 10);
+    check(scoring_persisted(), "a fresh init starts clean");
+    scoring_add_entry("ABC", 100);
+    check(!scoring_persisted(), "a save to a missing directory reports failure");
+
+    scoring_init(SCORES, 10);
+    check(scoring_persisted(), "a fresh init clears the previous failure");
+    scoring_add_entry("DEF", 200);
+    check(scoring_persisted(), "and a good save reports success again");
+
+    cleanup();
+}
+
 static void test_scoring_single(void) {
     printf("scoring: single table\n");
     cleanup();
@@ -195,6 +255,7 @@ static void test_running_score(void) {
 
 int main(void) {
     test_prefs();
+    test_persistence_reporting();
     test_scoring_single();
     test_scoring_tables();
     test_scoring_compat();

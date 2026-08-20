@@ -28,6 +28,14 @@ void prefs_init(const char *path) {
     pref_count = 0;
     persisted = 0;
     prefs_load();
+
+    /* Probe the card with a real write rather than waiting for the player to
+       change something. Before this, prefs_persisted() reported 0 on a perfectly
+       healthy card that simply had no settings file yet -- a game surfacing it
+       would have told every new player their settings were not being kept. It
+       also puts a missing sd:/apps/<app>/ directory on screen at boot, which is
+       exactly the failure that hid the longest. */
+    prefs_save();
 }
 
 int prefs_get_int(const char *key, int fallback) {
@@ -116,7 +124,9 @@ int prefs_load(void) {
     }
 
     free(buf);
-    persisted = 1;
+    /* Deliberately does not touch `persisted`: reading the file proves the card
+       can be read, which is a different question from whether it can be
+       written, and conflating the two is what made the flag unreliable. */
     return pref_count;
 }
 

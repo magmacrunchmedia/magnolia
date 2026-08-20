@@ -55,4 +55,13 @@ int  scoring_add_entry(const char *initials, int score);
 int  scoring_get_count(void);
 const ScoreEntry *scoring_get_entry(int index);
 
+/* Whether the last save reached the card, whichever table it was for -- this
+   one is not per-table, because the question it answers is about the card and
+   not about a leaderboard. Lets a game tell the player their scores are not
+   being kept, rather than appearing to forget them at random; the same question
+   prefs_persisted() answers for preferences, and the same failure, since a card
+   can report itself mounted and still refuse every write. 1 before anything has
+   been saved, because nothing has failed yet. */
+int  scoring_persisted(void);
+
 #endif

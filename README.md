@@ -107,7 +107,10 @@ modules are host-clean.
 **Storage** is where this started. Both `prefs` and `scoring` are about files,
 and an emulated SD card can report itself mounted while refusing every write —
 so the tests that can run on your own machine are the ones that can tell a
-broken save from a broken card.
+broken save from a broken card. Ask `prefs_persisted()` and
+`scoring_persisted()` if you want to show the player which it is;
+`magnolia_init()` probes the card with a real write, so both answer for the
+current card from boot rather than from whenever a setting next changes.
 
 **`menu`** gets the exhaustive sweep its header claims: every grid shape a game
 might ask for, every start position, every move — the cursor stays in range, the

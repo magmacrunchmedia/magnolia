@@ -17,6 +17,10 @@ static int current = 0;
 static int max_scores = MAGNOLIA_MAX_SCORES;
 static char base_path[160] = "";
 
+/* Whether the last write reached the card. Starts true: nothing has failed
+   yet, and reporting a failure that has not happened is its own bug. */
+static int persisted = 1;
+
 static ScoreTable *tbl(void) {
     return &tables[current];
 }
@@ -55,6 +59,9 @@ void scoring_init(const char *path, int max_entries) {
                ? max_entries : MAGNOLIA_MAX_SCORES;
 
     memset(tables, 0, sizeof(tables));
+    /* A fresh init is a fresh start: a failure recorded against the previous
+       path says nothing about this one. */
+    persisted = 1;
     table_count = 1;
     current = 0;
     tables[0].id[0] = '\0';
@@ -136,7 +143,14 @@ const ScoreEntry *scoring_get_entry(int index) {
 void scoring_save(void) {
     ScoreTable *t = tbl();
     FILE *f = fopen(t->path, "w");
-    if (!f) return;
+    if (!f) {
+        /* Almost always a missing sd:/apps/<app>/ directory or an absent card.
+           Recorded rather than ignored, so a game can say so -- a leaderboard
+           that quietly resets every power cycle is indistinguishable from one
+           the player never qualified for. */
+        persisted = 0;
+        return;
+    }
 
     fprintf(f, "{\"scores\":[");
     int count = t->count < max_scores ? t->count : max_scores;
@@ -147,7 +161,10 @@ void scoring_save(void) {
     }
     fprintf(f, "]}");
     fclose(f);
+    persisted = 1;
 }
+
+int scoring_persisted(void) { return persisted; }
 
 static void load_table(int index) {
     int saved = current;
