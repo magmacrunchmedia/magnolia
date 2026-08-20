@@ -1,38 +1,20 @@
-/* Host-side tests for the two engine modules that are pure C: the preference
- * store and the high-score tables. Both are about files, and files are exactly
- * what an emulator's SD card emulation can quietly refuse to give you -- these
- * ran green on a Mac while Dolphin was silently rejecting every write.
+/* Host-side tests for the two storage modules: the preference store and the
+ * high-score tables. Both are about files, and files are exactly what an
+ * emulator's SD card emulation can quietly refuse to give you -- these ran green
+ * on a Mac while Dolphin was silently rejecting every write, which is the whole
+ * reason they are worth having off-console.
  *
- *   cc -Wall -Wextra -I source -o /tmp/test_storage tests/test_storage.c \
- *      source/prefs.c source/scoring.c && /tmp/test_storage
+ *   make test-storage
  */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "harness.h"
 #include "prefs.h"
 #include "scoring.h"
 
-static int failures = 0;
-static int checks = 0;
-
-static void check(int cond, const char *what) {
-    checks++;
-    if (!cond) {
-        printf("  FAIL: %s\n", what);
-        failures++;
-    }
-}
-
-static void check_int(int got, int want, const char *what) {
-    checks++;
-    if (got != want) {
-        printf("  FAIL: %s (got %d, want %d)\n", what, got, want);
-        failures++;
-    }
-}
-
-static const char *PREFS = "/tmp/magnolia_test_prefs.json";
+static const char *PREFS  = "/tmp/magnolia_test_prefs.json";
 static const char *SCORES = "/tmp/magnolia_test_scores.json";
 
 static void cleanup(void) {
@@ -219,6 +201,5 @@ int main(void) {
     test_running_score();
     cleanup();
 
-    printf("\n%d checks, %d failures\n", checks, failures);
-    return failures ? 1 : 0;
+    return report();
 }

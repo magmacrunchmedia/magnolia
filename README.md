@@ -98,10 +98,28 @@ make        # builds libmagnolia.a; needs devkitPPC
 make test   # runs the host tests; needs only a C compiler
 ```
 
-`make test` covers `prefs` and `scoring`, which are plain C with no libogc in
-them. Both are about files, and an emulated SD card can report itself mounted
-while refusing every write — so the tests that can run on your own machine are
-the ones that can tell a broken save from a broken card.
+`make test` covers every engine module that is free of libogc — `prefs`,
+`scoring`, `menu` and `gamestate` — and runs each as its own binary
+(`make test-menu` and friends run one at a time). The source list per binary is
+written out in the Makefile rather than wildcarded; it is the record of which
+modules are host-clean.
+
+**Storage** is where this started. Both `prefs` and `scoring` are about files,
+and an emulated SD card can report itself mounted while refusing every write —
+so the tests that can run on your own machine are the ones that can tell a
+broken save from a broken card.
+
+**`menu`** gets the exhaustive sweep its header claims: every grid shape a game
+might ask for, every start position, every move — the cursor stays in range, the
+window follows it, and every item stays reachable. That simulation used to be
+something run once and thrown away.
+
+**`gamestate`** reaches libogc only through `input.h`, so its test links
+`tests/fake_input.c` in place of `source/input.c` and drives the real state
+machine on the host. The seam was already there in the shape of a header, so
+nothing in the shipping code changes to allow it. Worth having for the initials
+editor alone, which is the part `gamestate.h` gives as the reason the shell
+exists at all.
 
 Games can be driven without a controller: see the `AUTOSTART_GAMEPLAY` and
 `DEBUG_HEARTBEAT_FRAMES` hooks in the generated `config.h`. For `printf` to reach
