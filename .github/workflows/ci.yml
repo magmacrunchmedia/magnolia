@@ -1,0 +1,51 @@
+# The jobs are split by what they actually need, not by convenience.
+#
+# The host tests need nothing but a C compiler, so they run on a GitHub-hosted
+# runner. That is deliberate: these are the tests that must still run when the
+# dev box is off, and the whole argument for having them is that they are
+# reachable from anywhere. Tying them to one machine would undo that.
+#
+# Only the devkitPPC build genuinely needs the self-hosted runner, and it is
+# commented out below until its label has been confirmed -- a job queued against
+# a label no runner offers waits forever rather than failing, which is a worse
+# outcome than not having the job.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  host-tests:
+    name: host tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # prefs, scoring, menu and gamestate: every engine module that is free of
+      # libogc. Storage is the reason this exists -- an emulated SD card can
+      # report itself mounted and refuse every write, and only a test running
+      # off-console can tell that apart from a broken save.
+      - name: make test
+        run: make test
+
+  # Uncomment once the runner's label is confirmed. It needs devkitPPC; the
+  # Makefile errors out by design without DEVKITPRO and DEVKITPPC set.
+  #
+  # engine-build:
+  #   name: standalone engine build
+  #   runs-on: self-hosted
+  #   env:
+  #     DEVKITPRO: /opt/devkitpro
+  #     DEVKITPPC: /opt/devkitpro/devkitPPC
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     # Builds the engine with no game on the include path. If engine code ever
+  #     # reaches back into a game header, this fails here rather than the
+  #     # coupling being discovered by the next game months later.
+  #     - name: make
+  #       run: make

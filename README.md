@@ -124,6 +124,8 @@ nothing in the shipping code changes to allow it. Worth having for the initials
 editor alone, which is the part `gamestate.h` gives as the reason the shell
 exists at all.
 
+CI runs the host tests on every push; see `.github/workflows/ci.yml`.
+
 Games can be driven without a controller: see the `AUTOSTART_GAMEPLAY` and
 `DEBUG_HEARTBEAT_FRAMES` hooks in the generated `config.h`. For `printf` to reach
 Dolphin's log, its `Logger.ini` needs `OSREPORT = True` and `WriteToFile = True`;
