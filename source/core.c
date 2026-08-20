@@ -1,6 +1,7 @@
 #include <fat.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "core.h"
 #include "renderer.h"
 #include "scoring.h"
@@ -38,6 +39,21 @@ int magnolia_init(const MagnoliaConfig *cfg) {
 
     sd_mounted = fatInitDefault() ? 1 : 0;
     if (!sd_mounted) status = -1;
+
+    /* Create the app directory before anything tries to persist into it.
+       fopen(..., "w") fails outright when the parent directory is missing, and
+       libfat will not create one implicitly -- so without this, every score and
+       preference write fails silently on any card where the folder is not
+       already there. On a real console it usually is, because installing the app
+       created it, which is exactly why this went unnoticed: the save path only
+       breaks on the cards nobody installs to, which includes every fresh
+       emulator card. Both calls are harmless when the directory exists. */
+    if (sd_mounted) {
+        char dir[176];
+        mkdir("sd:/apps", 0777);
+        snprintf(dir, sizeof(dir), "sd:/apps/%s", app_name);
+        mkdir(dir, 0777);
+    }
 
     int max = (cfg && cfg->max_scores > 0) ? cfg->max_scores : MAGNOLIA_MAX_SCORES;
     snprintf(scores_path, sizeof(scores_path), "sd:/apps/%s/scores.json", app_name);
