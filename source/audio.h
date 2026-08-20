@@ -23,6 +23,13 @@ int  audio_available(void);
 int  audio_load_sfx(int slot, const char *path);
 void audio_play_sfx(int slot);
 
+/* Variants for PCM already in memory -- typically linked into the binary. The
+   buffer is used in place when it is already 32-byte aligned (ASND DMAs from
+   it); otherwise it is copied into an aligned one, so a change in how assets
+   are emitted costs memory rather than producing silent DMA corruption. */
+int  audio_load_sfx_mem(int slot, const void *data, unsigned int len);
+int  audio_play_music_mem(const void *data, unsigned int len);
+
 /* Loads and starts a looping track, replacing any current one. */
 int  audio_play_music(const char *path);
 /* Whether a music track is currently loaded in memory. */

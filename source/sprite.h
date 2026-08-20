@@ -15,6 +15,11 @@ typedef struct {
 
 /* Returns 1 on success. Failure leaves the Sprite empty and safe to draw. */
 int  sprite_load(Sprite *s, const char *path, int origin_x, int origin_y);
+
+/* Same, from an image already in memory -- typically a PNG linked into the
+   binary. Assets embedded this way cannot go missing or fall out of step with
+   the code, which file-backed assets very much can. */
+int  sprite_load_mem(Sprite *s, const void *data, int origin_x, int origin_y);
 void sprite_free(Sprite *s);
 int  sprite_valid(const Sprite *s);
 

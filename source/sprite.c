@@ -12,6 +12,18 @@ int sprite_load(Sprite *s, const char *path, int origin_x, int origin_y) {
     return s->tex != NULL;
 }
 
+int sprite_load_mem(Sprite *s, const void *data, int origin_x, int origin_y) {
+    if (!s) return 0;
+    s->tex = NULL;
+    s->origin_x = origin_x;
+    s->origin_y = origin_y;
+    if (!data) return 0;
+
+    /* GRRLIB sniffs the format from the header bytes. */
+    s->tex = GRRLIB_LoadTexture((const u8 *)data);
+    return s->tex != NULL;
+}
+
 void sprite_free(Sprite *s) {
     if (!s || !s->tex) return;
     GRRLIB_FreeTexture(s->tex);

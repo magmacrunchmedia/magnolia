@@ -14,7 +14,11 @@
 typedef struct {
     void *data;
     u32   size;
+    int   owned;      /* 0 when pointing at a linked-in buffer we must not free */
 } Clip;
+
+/* ASND DMAs straight out of these buffers. */
+#define AUDIO_ALIGN 32
 
 static Clip sfx[AUDIO_MAX_SFX];
 static Clip music;
@@ -24,9 +28,32 @@ static int  music_vol = 200;
 static int  sfx_vol = 255;
 static int  music_voice = -1;
 
+/* Point at the caller's buffer when alignment allows, else take an aligned copy. */
+static int adopt_clip(Clip *c, const void *data, u32 len) {
+    c->data = NULL;
+    c->size = 0;
+    c->owned = 0;
+    if (!data || !len) return 0;
+
+    if (((u32)data % AUDIO_ALIGN) == 0) {
+        c->data = (void *)data;
+        c->size = len;
+        return 1;
+    }
+
+    void *buf = memalign(AUDIO_ALIGN, len);
+    if (!buf) return 0;
+    memcpy(buf, data, len);
+    c->data = buf;
+    c->size = len;
+    c->owned = 1;
+    return 1;
+}
+
 static int load_clip(Clip *c, const char *path) {
     c->data = NULL;
     c->size = 0;
+    c->owned = 1;
 
     FILE *f = fopen(magnolia_asset_path(path), "rb");
     if (!f) return 0;
@@ -50,8 +77,10 @@ static int load_clip(Clip *c, const char *path) {
 }
 
 static void free_clip(Clip *c) {
-    if (c->data) { free(c->data); c->data = NULL; }
+    if (c->data && c->owned) free(c->data);
+    c->data = NULL;
     c->size = 0;
+    c->owned = 0;
 }
 
 int audio_init(void) {
@@ -82,6 +111,12 @@ int audio_load_sfx(int slot, const char *path) {
     return load_clip(&sfx[slot], path);
 }
 
+int audio_load_sfx_mem(int slot, const void *data, unsigned int len) {
+    if (!initialised || slot < 0 || slot >= AUDIO_MAX_SFX) return 0;
+    free_clip(&sfx[slot]);
+    return adopt_clip(&sfx[slot], data, len);
+}
+
 void audio_play_sfx(int slot) {
     if (!initialised || muted) return;
     if (slot < 0 || slot >= AUDIO_MAX_SFX || !sfx[slot].data) return;
@@ -95,15 +130,26 @@ void audio_play_sfx(int slot) {
                   sfx_vol, sfx_vol, NULL);
 }
 
-int audio_play_music(const char *path) {
-    if (!initialised) return 0;
-    audio_stop_music();
-    if (!load_clip(&music, path)) return 0;
-
+static void start_music_voice(void) {
     music_voice = 0;
     int vol = muted ? 0 : music_vol;
     ASND_SetInfiniteVoice(music_voice, PCM_FORMAT, PCM_RATE, 0,
                           music.data, (s32)music.size, vol, vol);
+}
+
+int audio_play_music_mem(const void *data, unsigned int len) {
+    if (!initialised) return 0;
+    audio_stop_music();
+    if (!adopt_clip(&music, data, len)) return 0;
+    start_music_voice();
+    return 1;
+}
+
+int audio_play_music(const char *path) {
+    if (!initialised) return 0;
+    audio_stop_music();
+    if (!load_clip(&music, path)) return 0;
+    start_music_voice();
     return 1;
 }
 
