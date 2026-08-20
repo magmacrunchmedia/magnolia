@@ -1,6 +1,6 @@
 # magnolia
 
-A lightweight Wii homebrew game engine by [MagmaCrunch](https://magmacrunch.com). Provides rendering, input, scoring, and UI utilities for games built with devkitPPC and GRRLIB.
+A lightweight Wii homebrew game engine by [nagmacrunch media](https://magmacrunch.com). Provides rendering, input, scoring, and UI utilities for games built with devkitPPC and GRRLIB.
 
 Named after the song "Magnolia" published by magmacrunch music.
 
