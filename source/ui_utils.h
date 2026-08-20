@@ -34,4 +34,35 @@ void ui_draw_centered_text(int design_y, const char *text,
                            unsigned int design_size, u32 color);
 void ui_draw_border(void);
 
+/* Width of `text` in DESIGN units, not screen pixels. Layout arithmetic belongs
+   in the design space; measuring in screen pixels and comparing against design
+   coordinates is a mistake that only shows up on the video mode you did not
+   test on. Returns 0 when no font loaded. */
+int ui_text_width(const char *text, unsigned int design_size);
+
+/* Centres text inside a design-space rectangle, horizontally and vertically.
+   Every tile, button and cell wants this; hand-computing it per draw site is how
+   a UI ends up subtly misaligned in six places. */
+void ui_draw_text_centered_in(int design_x, int design_y,
+                              int design_w, int design_h,
+                              const char *text, unsigned int design_size,
+                              u32 color);
+
+/* Filled panel with an optional outline and optional rounded corners. `radius`
+   is in design units; 0 gives a plain rectangle. Pass a fully transparent fill
+   or outline to skip that part. Tiles, modals, buttons and selection cells are
+   all this shape. */
+void ui_draw_panel(int design_x, int design_y, int design_w, int design_h,
+                   u32 fill, u32 outline, int radius);
+
+/* Full-screen scrim for modal layers. */
+void ui_draw_dim_overlay(u32 color);
+
+/* Word-wrapped paragraph text inside a design-space column, breaking on spaces.
+   Returns the design-space y just past the last line drawn, so callers can stack
+   paragraphs without counting lines themselves. */
+int ui_draw_text_wrapped(int design_x, int design_y, int design_w,
+                         const char *text, unsigned int design_size,
+                         u32 color, int line_spacing);
+
 #endif

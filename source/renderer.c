@@ -1,5 +1,6 @@
 #include <grrlib.h>
 #include "renderer.h"
+#include "clock.h"
 
 #include "PressStart2P.h"
 
@@ -35,6 +36,7 @@ void renderer_draw_background(void) {
 
 void renderer_finish(void) {
     GRRLIB_Render();
+    clock_tick();
 }
 
 void renderer_splash(const char *line1, const char *line2) {

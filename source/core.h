@@ -5,6 +5,11 @@
    this is a compile-time cap and MagnoliaConfig.max_scores a runtime limit. */
 #define MAGNOLIA_MAX_SCORES 16
 
+/* Ceiling on independent high-score tables. One game wants a single leaderboard;
+   another wants one per mode. Both are static arrays, so this is the compile-time
+   cap on how many a game may ask for. */
+#define MAGNOLIA_MAX_TABLES 12
+
 typedef struct {
     /* Homebrew Channel app directory name. The engine derives SD paths from it,
        e.g. sd:/apps/<app_name>/scores.json -- games do not hardcode paths. */

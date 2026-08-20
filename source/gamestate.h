@@ -9,8 +9,14 @@
 
 typedef enum {
     GS_TITLE,
+    /* Pre-run selection: character, difficulty, mode. The shell owns entering and
+       leaving it; what is being chosen, and how it is drawn, belongs to the game.
+       Both games had grown a loose "is the selector open" flag beside the state
+       machine because there was nowhere to put this. */
+    GS_MENU,
     GS_READY,
     GS_PLAYING,
+    GS_PAUSED,
     GS_GAME_OVER,
     GS_INITIALS,
     GS_HIGH_SCORES
@@ -27,6 +33,9 @@ typedef struct {
     char initials[4];
     int  cursor_pos;
     int  selected_letter;
+
+    /* Whether the title screen leads into GS_MENU. */
+    int  menu_enabled;
 } GameStateMachine;
 
 void gamestate_init(GameStateMachine *g);
@@ -46,5 +55,18 @@ int gamestate_update(GameStateMachine *g, int score);
 /* Editor helpers, exposed for games that draw their own initials screen. */
 void gamestate_begin_initials(GameStateMachine *g);
 void gamestate_commit_initials(GameStateMachine *g, int score);
+
+/* Whether A on the title screen opens GS_MENU instead of going straight to
+   GS_READY. Off by default, so a game with nothing to choose keeps the shorter
+   path. A game that turns it on draws the menu itself during GS_MENU and calls
+   gamestate_menu_confirm() when the player has chosen; B backs out to the title. */
+void gamestate_set_menu_enabled(GameStateMachine *g, int enabled);
+void gamestate_menu_confirm(GameStateMachine *g);
+
+/* Pause and resume during play. The game decides what pauses it -- the shell
+   only holds the state, since what should freeze and what should keep drawing is
+   never the same twice. */
+void gamestate_pause(GameStateMachine *g);
+void gamestate_resume(GameStateMachine *g);
 
 #endif

@@ -4,11 +4,13 @@
 #include "core.h"
 #include "renderer.h"
 #include "scoring.h"
+#include "prefs.h"
 #include "ui_utils.h"
 
 static int  sd_mounted = 0;
 static char app_name[64]     = "magnolia";
 static char scores_path[160];
+static char prefs_path[160];
 static char asset_buf[192];
 
 int magnolia_init(const MagnoliaConfig *cfg) {
@@ -40,6 +42,9 @@ int magnolia_init(const MagnoliaConfig *cfg) {
     int max = (cfg && cfg->max_scores > 0) ? cfg->max_scores : MAGNOLIA_MAX_SCORES;
     snprintf(scores_path, sizeof(scores_path), "sd:/apps/%s/scores.json", app_name);
     scoring_init(scores_path, max);
+
+    snprintf(prefs_path, sizeof(prefs_path), "sd:/apps/%s/settings.json", app_name);
+    prefs_init(prefs_path);
 
     return status;
 }

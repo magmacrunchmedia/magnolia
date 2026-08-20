@@ -24,7 +24,7 @@ my-game/
 ```makefile
 SOURCES     := source ../magnolia/source ../magnolia/font
 INCLUDES    := ../magnolia ../magnolia/source ../magnolia/font source
-LIBS        := -lgrrlib -lpngu -lfreetype -lpng -ljpeg -lz -lbrotlidec -lbrotlicommon -lbz2 -lfat -lwiiuse -lbte -logc -lm
+LIBS        := -lgrrlib -lpngu -lfreetype -lpng -ljpeg -lz -lbrotlidec -lbrotlicommon -lbz2 -lfat -lasnd -lwiiuse -lbte -logc -lm
 ```
 
 ### 3. Include and use
@@ -80,6 +80,34 @@ engine code ever reaches back into a game header, this build fails immediately
 instead of the coupling surfacing in the next game months later. Run it before
 committing engine changes.
 
+## Starting a new game
+
+```bash
+tools/new-game.sh my-game
+```
+
+Creates `../my-game` beside the engine with a Makefile, `meta.xml`, a `main.c`
+skeleton and staging targets. The Makefile carries the `bin2s` asset-embedding
+rules and the deploy targets — the parts that are non-obvious, and the parts that
+silently drift when they are retyped for each new game.
+
+## Testing
+
+```bash
+make        # builds libmagnolia.a; needs devkitPPC
+make test   # runs the host tests; needs only a C compiler
+```
+
+`make test` covers `prefs` and `scoring`, which are plain C with no libogc in
+them. Both are about files, and an emulated SD card can report itself mounted
+while refusing every write — so the tests that can run on your own machine are
+the ones that can tell a broken save from a broken card.
+
+Games can be driven without a controller: see the `AUTOSTART_GAMEPLAY` and
+`DEBUG_HEARTBEAT_FRAMES` hooks in the generated `config.h`. For `printf` to reach
+Dolphin's log, its `Logger.ini` needs `OSREPORT = True` and `WriteToFile = True`;
+both default to False, which makes a working trace look like a dead one.
+
 ## Design rule
 
 magnolia holds what more than one game needs. Anything shaped by a single game
@@ -96,12 +124,15 @@ designed against one example usually fits only that example.
 | **core** | `core.h` | `magnolia_init()` bring-up, init status, SD asset paths |
 | **renderer** | `renderer.h` | GRRLIB init, TTF font, real video-mode geometry, frame flush |
 | **sprite** | `sprite.h` | Texture load/free, draw-at-origin, scaled draw |
-| **input** | `input.h` | Wiimote button/D-pad wrapper |
-| **audio** | `audio.h` | PCM16 music loop + SFX over ASND |
-| **scoring** | `scoring.h` | High-score table with SD JSON persistence |
-| **gamestate** | `gamestate.h` | Score-attack shell and initials editor |
+| **input** | `input.h` | Wiimote buttons, D-pad, hold and auto-repeat |
+| **audio** | `audio.h` | PCM music loop + SFX over ASND, mono/stereo, any rate |
+| **scoring** | `scoring.h` | High-score tables (one or many) with SD JSON persistence |
+| **prefs** | `prefs.h` | Persisted int key/value store for player preferences |
+| **gamestate** | `gamestate.h` | Score-attack shell, pre-run menu, pause, initials editor |
+| **menu** | `menu.h` | Grid/list cursor with wrapping and a scrolling window |
+| **clock** | `clock.h` | Frame counter, delta time, easing |
 | **theme** | `theme.h` | HSL→RGB palette generator, complementary colours |
-| **ui_utils** | `ui_utils.h` | Design-space → TV-safe layout, text, border |
+| **ui_utils** | `ui_utils.h` | Design-space → TV-safe layout, text, panels, wrapping |
 
 ### Not in the engine, by design
 
@@ -127,8 +158,19 @@ Assets are raw signed 16-bit little-endian stereo at 48kHz:
 ffmpeg -i in.ogg -f s16le -acodec pcm_s16le -ar 48000 -ac 2 out.pcm
 ```
 
-Clips are held in main RAM — budget ~192KB per second of audio against the
-Wii's 24MB, and trim long tracks rather than streaming them.
+Clips are held decoded in main RAM, so format is a memory decision before it is a
+fidelity one:
+
+| Format | Per second | Per minute |
+|---|---|---|
+| 48kHz stereo | ~192 KB | ~11.5 MB |
+| 48kHz mono | ~96 KB | ~5.8 MB |
+| 24kHz mono | ~48 KB | ~2.9 MB |
+
+Against the Wii's 24MB, a two-minute track at 48kHz stereo does not fit at all.
+Keep short effects at 48kHz stereo — they are what the player hears most
+sharply — and pass a lower rate or mono for a long music loop via
+`audio_play_music_fmt()`. Trim rather than stream.
 
 ## Dependencies
 

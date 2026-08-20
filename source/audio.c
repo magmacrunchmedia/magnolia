@@ -6,15 +6,20 @@
 #include "audio.h"
 #include "core.h"
 
+#define PCM_RATE     AUDIO_RATE_DEFAULT
+
 /* ffmpeg's s16le output is little-endian; the Wii is big-endian, so the voice
    format has to say so or every sample comes out as noise. */
-#define PCM_FORMAT   VOICE_STEREO_16BIT_LE
-#define PCM_RATE     48000
+static u32 voice_format(AudioFormat fmt) {
+    return (fmt == AUDIO_MONO_16) ? VOICE_MONO_16BIT_LE : VOICE_STEREO_16BIT_LE;
+}
 
 typedef struct {
     void *data;
     u32   size;
     int   owned;      /* 0 when pointing at a linked-in buffer we must not free */
+    u32   format;     /* the ASND voice format this clip's samples are in */
+    s32   rate;
 } Clip;
 
 /* ASND DMAs straight out of these buffers. */
@@ -105,16 +110,31 @@ void audio_shutdown(void) {
 
 int audio_available(void) { return initialised; }
 
-int audio_load_sfx(int slot, const char *path) {
+int audio_load_sfx_fmt(int slot, const char *path, AudioFormat fmt, int rate) {
     if (!initialised || slot < 0 || slot >= AUDIO_MAX_SFX) return 0;
     free_clip(&sfx[slot]);
-    return load_clip(&sfx[slot], path);
+    if (!load_clip(&sfx[slot], path)) return 0;
+    sfx[slot].format = voice_format(fmt);
+    sfx[slot].rate   = rate > 0 ? rate : PCM_RATE;
+    return 1;
+}
+
+int audio_load_sfx_mem_fmt(int slot, const void *data, unsigned int len,
+                           AudioFormat fmt, int rate) {
+    if (!initialised || slot < 0 || slot >= AUDIO_MAX_SFX) return 0;
+    free_clip(&sfx[slot]);
+    if (!adopt_clip(&sfx[slot], data, len)) return 0;
+    sfx[slot].format = voice_format(fmt);
+    sfx[slot].rate   = rate > 0 ? rate : PCM_RATE;
+    return 1;
+}
+
+int audio_load_sfx(int slot, const char *path) {
+    return audio_load_sfx_fmt(slot, path, AUDIO_STEREO_16, PCM_RATE);
 }
 
 int audio_load_sfx_mem(int slot, const void *data, unsigned int len) {
-    if (!initialised || slot < 0 || slot >= AUDIO_MAX_SFX) return 0;
-    free_clip(&sfx[slot]);
-    return adopt_clip(&sfx[slot], data, len);
+    return audio_load_sfx_mem_fmt(slot, data, len, AUDIO_STEREO_16, PCM_RATE);
 }
 
 void audio_play_sfx(int slot) {
@@ -125,7 +145,7 @@ void audio_play_sfx(int slot) {
     /* Voice 0 is reserved for music so a burst of effects cannot evict it. */
     if (voice <= 0 || voice >= MAX_SND_VOICES) return;
 
-    ASND_SetVoice(voice, PCM_FORMAT, PCM_RATE, 0,
+    ASND_SetVoice(voice, sfx[slot].format, sfx[slot].rate, 0,
                   sfx[slot].data, (s32)sfx[slot].size,
                   sfx_vol, sfx_vol, NULL);
 }
@@ -133,24 +153,37 @@ void audio_play_sfx(int slot) {
 static void start_music_voice(void) {
     music_voice = 0;
     int vol = muted ? 0 : music_vol;
-    ASND_SetInfiniteVoice(music_voice, PCM_FORMAT, PCM_RATE, 0,
+    ASND_SetInfiniteVoice(music_voice, music.format, music.rate, 0,
                           music.data, (s32)music.size, vol, vol);
 }
 
-int audio_play_music_mem(const void *data, unsigned int len) {
+int audio_play_music_mem_fmt(const void *data, unsigned int len,
+                             AudioFormat fmt, int rate) {
     if (!initialised) return 0;
     audio_stop_music();
     if (!adopt_clip(&music, data, len)) return 0;
+    music.format = voice_format(fmt);
+    music.rate   = rate > 0 ? rate : PCM_RATE;
     start_music_voice();
     return 1;
 }
 
-int audio_play_music(const char *path) {
+int audio_play_music_fmt(const char *path, AudioFormat fmt, int rate) {
     if (!initialised) return 0;
     audio_stop_music();
     if (!load_clip(&music, path)) return 0;
+    music.format = voice_format(fmt);
+    music.rate   = rate > 0 ? rate : PCM_RATE;
     start_music_voice();
     return 1;
+}
+
+int audio_play_music_mem(const void *data, unsigned int len) {
+    return audio_play_music_mem_fmt(data, len, AUDIO_STEREO_16, PCM_RATE);
+}
+
+int audio_play_music(const char *path) {
+    return audio_play_music_fmt(path, AUDIO_STEREO_16, PCM_RATE);
 }
 
 int audio_music_loaded(void) { return music.data != NULL; }
