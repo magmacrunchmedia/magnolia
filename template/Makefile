@@ -4,11 +4,15 @@
 .SUFFIXES:
 .SECONDARY:
 #---------------------------------------------------------------------------------
+# The host tests deliberately need no cross-compiler: requiring devkitPPC to run
+# them would put them out of reach on the machine where they are most useful.
+ifeq ($(filter test,$(MAKECMDGOALS)),)
 ifeq ($(strip $(DEVKITPPC)),)
 $(error "Please set DEVKITPPC. export DEVKITPPC=<path to>devkitPPC")
 endif
 
 include $(DEVKITPPC)/wii_rules
+endif
 
 #---------------------------------------------------------------------------------
 TARGET      := __GAME__
@@ -80,7 +84,25 @@ $(filter-out assets.o,$(OFILES)): assets.h
 else
 #---------------------------------------------------------------------------------
 
-.PHONY: $(BUILD) clean all deploy dolphin
+.PHONY: $(BUILD) clean all deploy dolphin test
+
+# Stated explicitly: the host-test rule below would otherwise be the first
+# target in the file, and a bare `make` would run the tests instead of
+# building the game.
+.DEFAULT_GOAL := all
+
+# Host-side tests. Anything in source/ that is free of libogc can be tested on
+# the machine you are sitting at, in a second, with no emulator in the loop --
+# which is where game rules belong, because a rule that is subtly wrong looks
+# exactly like a rule that is right until someone plays far enough to notice.
+HOSTCC   ?= cc
+TESTSRC  ?= $(wildcard tests/*.c)
+TESTDEPS ?= 
+
+test:
+	@mkdir -p $(BUILD)
+	@$(HOSTCC) -Wall -Wextra -I source -o $(BUILD)/test $(TESTSRC) $(TESTDEPS)
+	@$(BUILD)/test
 
 all: $(BUILD)
 
