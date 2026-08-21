@@ -146,7 +146,7 @@ designed against one example usually fits only that example.
 |--------|--------|-------------|
 | **core** | `core.h` | `magnolia_init()` bring-up, init status, SD asset paths |
 | **renderer** | `renderer.h` | GRRLIB init, TTF font, real video-mode geometry, frame flush |
-| **sprite** | `sprite.h` | Texture load/free, draw-at-origin, scaled draw |
+| **sprite** | `sprite.h` | Texture load/free, draw-at-origin, uniform and per-axis scaled draw |
 | **input** | `input.h` | Wiimote buttons, D-pad, hold and auto-repeat |
 | **audio** | `audio.h` | PCM music loop + SFX over ASND, mono/stereo, any rate |
 | **scoring** | `scoring.h` | High-score tables (one or many) with SD JSON persistence |

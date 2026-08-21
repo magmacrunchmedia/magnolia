@@ -36,4 +36,11 @@ void sprite_draw_tinted(const Sprite *s, float x, float y, u32 tint);
 void sprite_draw_scaled(const Sprite *s, float x, float y, float scale);
 void sprite_draw_scaled_tinted(const Sprite *s, float x, float y, float scale, u32 tint);
 
+/* Independent horizontal and vertical factors, for projecting a world onto a
+   framebuffer whose pixels are not square -- 16:9 output stretches a 640x480
+   frame, so a single scale that is right vertically is a third too wide. The
+   origin still lands exactly on (x, y). */
+void sprite_draw_scaled_xy(const Sprite *s, float x, float y, float sx, float sy);
+void sprite_draw_scaled_xy_tinted(const Sprite *s, float x, float y, float sx, float sy, u32 tint);
+
 #endif

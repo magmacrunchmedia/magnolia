@@ -42,13 +42,24 @@ int sprite_height(const Sprite *s) {
     return sprite_valid(s) ? s->tex->h : 0;
 }
 
+void sprite_draw_scaled_xy_tinted(const Sprite *s, float x, float y,
+                                  float sx, float sy, u32 tint) {
+    if (!sprite_valid(s)) return;
+    /* Offset scales with the image on each axis independently, keeping the
+       origin on (x, y) whatever the two factors are. */
+    GRRLIB_DrawImg(x - (float)s->origin_x * sx,
+                   y - (float)s->origin_y * sy,
+                   s->tex, 0, sx, sy, tint);
+}
+
+void sprite_draw_scaled_xy(const Sprite *s, float x, float y,
+                           float sx, float sy) {
+    sprite_draw_scaled_xy_tinted(s, x, y, sx, sy, RGBA(255, 255, 255, 255));
+}
+
 void sprite_draw_scaled_tinted(const Sprite *s, float x, float y,
                                float scale, u32 tint) {
-    if (!sprite_valid(s)) return;
-    /* Offset scales with the image, keeping the origin on (x, y) at any size. */
-    GRRLIB_DrawImg(x - (float)s->origin_x * scale,
-                   y - (float)s->origin_y * scale,
-                   s->tex, 0, scale, scale, tint);
+    sprite_draw_scaled_xy_tinted(s, x, y, scale, scale, tint);
 }
 
 void sprite_draw_scaled(const Sprite *s, float x, float y, float scale) {
