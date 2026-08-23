@@ -29,6 +29,10 @@ typedef struct {
     int is_high_score;
     int rank;
 
+    /* Run statistics, set by the game before entering GS_INITIALS. */
+    int moves;
+    int highest_earned;
+
     /* Initials editor. */
     char initials[4];
     int  cursor_pos;

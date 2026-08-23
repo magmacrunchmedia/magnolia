@@ -6,6 +6,8 @@
 typedef struct {
     char initials[4];
     int score;
+    int moves;          /* total moves in the run */
+    int highest_earned; /* best value built by merging, not spawned */
 } ScoreEntry;
 
 /* High scores, in one or more independent tables.
@@ -51,7 +53,8 @@ void scoring_save(void);
 int  scoring_load(void);
 int  scoring_is_high_score(int score);
 int  scoring_get_rank(int score);
-int  scoring_add_entry(const char *initials, int score);
+int  scoring_add_entry(const char *initials, int score, int moves,
+                       int highest_earned);
 int  scoring_get_count(void);
 const ScoreEntry *scoring_get_entry(int index);
 

@@ -98,7 +98,8 @@ int  scoring_get(void)       { return current_score; }
 void scoring_add(int points) { current_score += points; }
 void scoring_increment(void) { scoring_add(1); }
 
-int scoring_add_entry(const char *initials, int score) {
+int scoring_add_entry(const char *initials, int score, int moves,
+                      int highest_earned) {
     ScoreTable *t = tbl();
     if (score <= 0) return -1;
 
@@ -121,6 +122,8 @@ int scoring_add_entry(const char *initials, int score) {
     strncpy(t->entries[rank].initials, initials, 3);
     t->entries[rank].initials[3] = '\0';
     t->entries[rank].score = score;
+    t->entries[rank].moves = moves;
+    t->entries[rank].highest_earned = highest_earned;
 
     if (t->count < max_scores) t->count++;
 
@@ -156,8 +159,10 @@ void scoring_save(void) {
     int count = t->count < max_scores ? t->count : max_scores;
     for (int i = 0; i < count; i++) {
         if (i > 0) fprintf(f, ",");
-        fprintf(f, "{\"initials\":\"%s\",\"score\":%d}",
-                t->entries[i].initials, t->entries[i].score);
+        fprintf(f, "{\"initials\":\"%s\",\"score\":%d,\"moves\":%d,"
+                "\"highest_earned\":%d}",
+                t->entries[i].initials, t->entries[i].score,
+                t->entries[i].moves, t->entries[i].highest_earned);
     }
     fprintf(f, "]}");
     fclose(f);
@@ -223,10 +228,26 @@ int scoring_load(void) {
         if (p && p + 8 < end) {
             p += 8;
             t->entries[t->count].score = atoi(p);
-            t->count++;
         } else {
             break;
         }
+
+        /* Optional fields -- absent in older score files, default to 0. */
+        t->entries[t->count].moves = 0;
+        t->entries[t->count].highest_earned = 0;
+
+        char *m = strstr(p, "\"moves\":");
+        if (m && m < end) {
+            m += 8;
+            t->entries[t->count].moves = atoi(m);
+        }
+        char *h = strstr(p, "\"highest_earned\":");
+        if (h && h < end) {
+            h += 17;
+            t->entries[t->count].highest_earned = atoi(h);
+        }
+
+        t->count++;
     }
 
     free(buf);
