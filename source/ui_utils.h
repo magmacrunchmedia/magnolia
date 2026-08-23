@@ -28,6 +28,19 @@ int ui_map_w(int design_w);
 int ui_map_h(int design_h);
 unsigned int ui_map_size(unsigned int design_size);
 
+/* The drop shadow under every string drawn by this module, and the colour of
+   ui_draw_border(). Both were compile-time constants -- black and cyan -- which
+   is right for light text on a dark background and wrong the moment a game puts
+   a dark glyph on a pale panel: the shadow turns it into a smudge. A themed game
+   sets these once at startup, as it does the overscan.
+
+   Defaults are the original black and cyan, so a game that never calls these
+   looks exactly as it did. */
+void ui_set_shadow_color(u32 color);
+u32  ui_get_shadow_color(void);
+void ui_set_border_color(u32 color);
+u32  ui_get_border_color(void);
+
 void ui_draw_text_shadow(int design_x, int design_y, const char *text,
                          unsigned int design_size, u32 color);
 void ui_draw_centered_text(int design_y, const char *text,

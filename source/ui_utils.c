@@ -4,10 +4,18 @@
 #include "ui_utils.h"
 #include "renderer.h"
 
-#define CYAN   RGBA(0, 212, 255, 255)
-#define SHADOW RGBA(0, 0, 0, 255)
 
 static int overscan_pct = 6;
+
+/* The drop shadow under every string this module draws, and the border colour.
+   Both were compile-time constants until a game put dark text on a pale panel:
+   a black shadow under a red card rank turns the glyph into a smudge, and a
+   cyan border on a lava table reads as another program's chrome. Settable for
+   the same reason the overscan is -- it is a property of the game's look, not
+   of the drawing. Defaults are what they always were, so a caller that never
+   touches them sees no change. */
+static u32 shadow_color = 0x000000FF;
+static u32 border_color = 0x00D4FFFF;
 
 void ui_set_overscan_pct(int pct) {
     if (pct < 0)  pct = 0;
@@ -16,6 +24,12 @@ void ui_set_overscan_pct(int pct) {
 }
 
 int ui_get_overscan_pct(void) { return overscan_pct; }
+
+void ui_set_shadow_color(u32 color) { shadow_color = color; }
+u32  ui_get_shadow_color(void)      { return shadow_color; }
+
+void ui_set_border_color(u32 color) { border_color = color; }
+u32  ui_get_border_color(void)      { return border_color; }
 
 int ui_safe_x(void) { return (renderer_screen_width()  * overscan_pct) / 100; }
 int ui_safe_y(void) { return (renderer_screen_height() * overscan_pct) / 100; }
@@ -50,7 +64,7 @@ void ui_draw_text_shadow(int design_x, int design_y, const char *text,
     int x = ui_map_x(design_x);
     int y = ui_map_y(design_y);
     unsigned int size = ui_map_size(design_size);
-    GRRLIB_PrintfTTF(x + 2, y + 2, ttf_font, text, size, SHADOW);
+    GRRLIB_PrintfTTF(x + 2, y + 2, ttf_font, text, size, shadow_color);
     GRRLIB_PrintfTTF(x, y, ttf_font, text, size, color);
 }
 
@@ -62,7 +76,7 @@ void ui_draw_centered_text(int design_y, const char *text,
     int x = ui_safe_x() + (ui_safe_w() - (int)w) / 2;
     int y = ui_map_y(design_y);
     if (x < 0) x = 0;
-    GRRLIB_PrintfTTF(x + 2, y + 2, ttf_font, text, size, SHADOW);
+    GRRLIB_PrintfTTF(x + 2, y + 2, ttf_font, text, size, shadow_color);
     GRRLIB_PrintfTTF(x, y, ttf_font, text, size, color);
 }
 
@@ -70,10 +84,10 @@ void ui_draw_border(void) {
     int x = ui_safe_x(), y = ui_safe_y();
     int w = ui_safe_w(), h = ui_safe_h();
     int t = 3;
-    GRRLIB_Rectangle(x, y, w, t, CYAN, true);
-    GRRLIB_Rectangle(x, y + h - t, w, t, CYAN, true);
-    GRRLIB_Rectangle(x, y, t, h, CYAN, true);
-    GRRLIB_Rectangle(x + w - t, y, t, h, CYAN, true);
+    GRRLIB_Rectangle(x, y, w, t, border_color, true);
+    GRRLIB_Rectangle(x, y + h - t, w, t, border_color, true);
+    GRRLIB_Rectangle(x, y, t, h, border_color, true);
+    GRRLIB_Rectangle(x + w - t, y, t, h, border_color, true);
 }
 
 int ui_text_width(const char *text, unsigned int design_size) {
@@ -99,7 +113,7 @@ void ui_draw_text_centered_in(int design_x, int design_y,
        point size that centring on it reads correctly at these sizes. */
     int y = ui_map_y(design_y) + (ui_map_h(design_h) - (int)size) / 2;
 
-    GRRLIB_PrintfTTF(x + 2, y + 2, ttf_font, text, size, SHADOW);
+    GRRLIB_PrintfTTF(x + 2, y + 2, ttf_font, text, size, shadow_color);
     GRRLIB_PrintfTTF(x, y, ttf_font, text, size, color);
 }
 
