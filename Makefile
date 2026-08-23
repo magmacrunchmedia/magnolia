@@ -20,7 +20,7 @@
 # them would put them out of reach on the machine where they are most useful.
 # Named once, so the guard below and the rules further down cannot drift apart --
 # `make test-menu` on a laptop with no cross-compiler has to work too.
-HOST_TESTS := test-storage test-menu test-gamestate
+HOST_TESTS := test-storage test-menu test-gamestate test-theme
 
 ifeq ($(filter test $(HOST_TESTS),$(MAKECMDGOALS)),)
 ifeq ($(strip $(DEVKITPPC)),)
@@ -87,6 +87,14 @@ test-gamestate: | $(BUILD)
 	@$(HOSTCC) $(HOSTCFLAGS) -o $(BUILD)/$@ \
 	    tests/test_gamestate.c tests/fake_input.c \
 	    source/gamestate.c source/scoring.c
+	@$(BUILD)/$@
+
+# theme.c is nothing but arithmetic and was unreachable here only because its
+# header asked for libogc to get one typedef. Guarded now, so it runs. -lm
+# because the HSL conversion is the one engine module that uses libm.
+test-theme: | $(BUILD)
+	@$(HOSTCC) $(HOSTCFLAGS) -o $(BUILD)/$@ \
+	    tests/test_theme.c source/theme.c -lm
 	@$(BUILD)/$@
 
 $(TARGET): $(OBJS)

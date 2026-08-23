@@ -1,7 +1,17 @@
 #ifndef THEME_H
 #define THEME_H
 
+/* gccore is here for one typedef, and requiring it costs more than it gives:
+   this header sits at the bottom of Moonlight Drift's obstacles.h, so pulling
+   in libogc made that game's richest module impossible to compile on a
+   development machine, and left theme.c -- which is nothing but arithmetic --
+   untested in the engine too. devkitPPC defines GEKKO for the console build.
+   Same trick as george-boole-wii/source/palette.h. */
+#ifdef GEKKO
 #include <gccore.h>
+#else
+typedef unsigned char u8;
+#endif
 
 typedef struct {
     u8 r, g, b;
