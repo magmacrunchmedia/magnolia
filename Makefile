@@ -1,5 +1,5 @@
 #---------------------------------------------------------------------------------
-# magnolia - Wii game engine library by MagmaCrunch
+# magnolia - Wii game engine library by magmacrunch
 #---------------------------------------------------------------------------------
 # Games consume the sources directly; add this engine to your own Makefile with:
 #   SOURCES  := source ../magnolia/source ../magnolia/font

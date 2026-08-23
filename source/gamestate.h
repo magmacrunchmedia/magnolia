@@ -1,7 +1,7 @@
 #ifndef GAMESTATE_H
 #define GAMESTATE_H
 
-/* The score-attack shell shared by MagmaCrunch arcade ports: title, optional
+/* The score-attack shell shared by magmacrunch arcade ports: title, optional
    how-to-play, play, game over, initials entry on a qualifying score, then the
    leaderboard. Games own what happens during GS_PLAYING and supply their own
    drawing; this owns the transitions and the initials editor, which is fiddly
