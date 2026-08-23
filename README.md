@@ -1,8 +1,10 @@
 # magnolia
 
-A lightweight Wii homebrew game engine by [nagmacrunch media](https://magmacrunch.com). Provides rendering, input, scoring, and UI utilities for games built with devkitPPC and GRRLIB.
+A lightweight Wii homebrew game engine by [magmacrunch media](https://magmacrunch.com). Provides rendering, input, scoring, audio, and UI utilities for games built with devkitPPC and GRRLIB.
 
 Named after the song "Magnolia" published by magmacrunch music.
+
+Current version: **0.3.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed.
 
 ## Quick Start
 
@@ -27,6 +29,8 @@ INCLUDES    := ../magnolia ../magnolia/source ../magnolia/font source
 LIBS        := -lgrrlib -lpngu -lfreetype -lpng -ljpeg -lz -lbrotlidec -lbrotlicommon -lbz2 -lfat -lasnd -lwiiuse -lbte -logc -lm
 ```
 
+Games build magnolia's sources directly — there is no `libmagnolia.a` linking step.
+
 ### 3. Include and use
 
 ```c
@@ -40,10 +44,11 @@ int main(void) {
     };
 
     /* Brings up SD, video, font, UI metrics and scoring in the right order.
-       A non-zero return means the engine is usable but degraded -- check
-       magnolia_sd_mounted() / magnolia_fonts_loaded() and tell the player,
-       rather than silently rendering placeholder art. */
+       Returns 0 when everything came up. A negative return means the engine is
+       usable but degraded — see the return code table below. */
     int status = magnolia_init(&cfg);
+    if (status == -2) return 1;   /* video never came up — nothing useful is possible */
+
     input_init();
 
     GameStateMachine gs;
@@ -56,7 +61,7 @@ int main(void) {
         if (gamestate_current(&gs) == GS_PLAYING) {
             /* your game */
         } else if (gamestate_update(&gs, score)) {
-            /* just entered GS_PLAYING -- reset your world */
+            /* just entered GS_PLAYING — reset your world */
         }
 
         renderer_draw_background();
@@ -75,10 +80,53 @@ cd magnolia && make      # builds libmagnolia.a
 ```
 
 This compiles the engine with **no game directory on the include path**. It is
-not how games consume magnolia -- they build the sources directly -- but if
+not how games consume magnolia — they build the sources directly — but if
 engine code ever reaches back into a game header, this build fails immediately
 instead of the coupling surfacing in the next game months later. Run it before
 committing engine changes.
+
+## Init return codes
+
+`magnolia_init()` returns 0 when everything came up. A negative return means
+the engine is usable but degraded — query the accessors and tell the player
+rather than silently rendering placeholder art.
+
+| Code | Meaning | Query |
+|------|---------|-------|
+| `0` | All OK | — |
+| `-1` | SD card not mounted | `magnolia_sd_mounted()` |
+| `-2` | Video failed (nothing further is useful) | — return immediately |
+| `-3` | Font missing, video is up | `magnolia_fonts_loaded()` |
+
+A negative return is not a failure — the engine is running, but the player may
+see placeholder art or be unable to save. Check the specific condition and
+surface it in-game (e.g. "SD card not inserted — scores will not be saved").
+
+## Architecture
+
+The engine is 12 modules in `magnolia/source/`, included through the umbrella
+`magnolia.h`. The dependency graph:
+
+```
+core ─── renderer ─── ui_utils ─── theme
+ │           │            │
+ │           ├────────────┼──── menu
+ │           │            │
+ │           ├────────────┼──── scoring
+ │           │            │
+ │           ├────────────┼──── prefs
+ │           │
+ │           ├────────────┼──── audio
+ │           │
+ │           └────────────┼──── clock
+ │
+ └── input ───────────────┼──── gamestate
+```
+
+**`core`** owns the boot order and the SD paths. **`renderer`** owns the video
+and font. Everything else hangs off those two. `gamestate` depends on `input`
+for the controller seam; `menu` depends on `gamestate` for the state machine;
+`ui_utils` depends on `renderer` for the screen geometry.
 
 ## Starting a new game
 
@@ -91,6 +139,21 @@ skeleton and staging targets. The Makefile carries the `bin2s` asset-embedding
 rules and the deploy targets — the parts that are non-obvious, and the parts that
 silently drift when they are retyped for each new game.
 
+## Deployment
+
+```bash
+make deploy     # stage sdcard/apps/my-game/ (local development)
+make dolphin    # push to Dolphin's SD card folder (emulator)
+make card SD=/mnt/e   # install onto a real SD card (merges, preserves saves)
+make wii WIILOAD=tcp:<wii-ip>  # send to a running console over the network
+```
+
+`make card` merges — only `boot.dol` and `meta.xml` are overwritten, so saved
+scores and settings survive. `make wii` sends the `.dol` over the network and
+runs it immediately; nothing is written to the card.
+
+See [wiki: Getting Started](../../wiki/Getting-Started) for full deployment details.
+
 ## Testing
 
 ```bash
@@ -99,7 +162,7 @@ make test   # runs the host tests; needs only a C compiler
 ```
 
 `make test` covers every engine module that is free of libogc — `prefs`,
-`scoring`, `menu` and `gamestate` — and runs each as its own binary
+`scoring`, `menu`, `gamestate`, and `theme` — and runs each as its own binary
 (`make test-menu` and friends run one at a time). The source list per binary is
 written out in the Makefile rather than wildcarded; it is the record of which
 modules are host-clean.
@@ -114,15 +177,15 @@ current card from boot rather than from whenever a setting next changes.
 
 **`menu`** gets the exhaustive sweep its header claims: every grid shape a game
 might ask for, every start position, every move — the cursor stays in range, the
-window follows it, and every item stays reachable. That simulation used to be
-something run once and thrown away.
+window follows it, and every item stays reachable.
 
 **`gamestate`** reaches libogc only through `input.h`, so its test links
 `tests/fake_input.c` in place of `source/input.c` and drives the real state
-machine on the host. The seam was already there in the shape of a header, so
-nothing in the shipping code changes to allow it. Worth having for the initials
-editor alone, which is the part `gamestate.h` gives as the reason the shell
-exists at all.
+machine on the host.
+
+**`theme`** is pure arithmetic guarded by `#ifdef GEKKO`, so it compiles on the
+host. The test checks HSL primaries, secondaries, complementaries, grey, black,
+white, wrap-around, and `theme_generate()` ranges over 2000 palettes.
 
 CI runs the host tests on every push; see `.github/workflows/ci.yml`.
 
@@ -137,7 +200,7 @@ magnolia holds what more than one game needs. Anything shaped by a single game
 belongs in that game. Concretely: sprite loading and the origin concept are
 engine; a particular character roster is not. A high-score table is engine; a
 jetman's gravity is not. When something looks reusable but has exactly one
-consumer, leave it in the game until a second one appears -- an abstraction
+consumer, leave it in the game until a second one appears — an abstraction
 designed against one example usually fits only that example.
 
 ## Engine Modules
@@ -159,8 +222,8 @@ designed against one example usually fits only that example.
 
 ### Not in the engine, by design
 
-`player`, `stars` and `characters` used to live here and now belong to
-Moonlight Drift. They encoded one game's decisions — jetman physics, a specific
+`player`, `stars` and `characters` used to live here and now belong to the games
+that own them. They encoded one game's decisions — jetman physics, a specific
 starfield, a fixed character roster — and forced the engine to depend on that
 game's `config.h`. If a second game needs something similar, generalise it then,
 against two real examples.
@@ -195,6 +258,12 @@ Keep short effects at 48kHz stereo — they are what the player hears most
 sharply — and pass a lower rate or mono for a long music loop via
 `audio_play_music_fmt()`. Trim rather than stream.
 
+## Used by
+
+- [Moonlight Drift Wii](https://github.com/magmacrunchmedia/moonlight-drift-wii) — Jetman-style arcade game
+- [George Boole Wii](https://github.com/magmacrunchmedia/george-boole-wii) — Number puzzle with leaderboards
+- [Lava Dome Wii](https://github.com/magmacrunchmedia/lava-dome-wii) — Dice game
+
 ## Dependencies
 
 | Package | Source |
@@ -205,6 +274,10 @@ sharply — and pass a lower rate or mono for a long music loop via
 | ppc-libpng, ppc-freetype, ppc-libjpeg-turbo | `dkp-pacman` |
 | libfat-ogc | `dkp-pacman` |
 | libasnd (audio) | Bundled with devkitPro |
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for code style, testing, and commit conventions.
 
 ## Font
 
