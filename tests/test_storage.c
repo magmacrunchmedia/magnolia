@@ -103,17 +103,17 @@ static void test_persistence_reporting(void) {
     scoring_init(SCORES, 10);
     check(scoring_persisted(), "nothing has failed before the first save");
 
-    scoring_add_entry("ABC", 100);
+    scoring_add_entry("ABC", 100, 0, 0);
     check(scoring_persisted(), "a save to a good path reports success");
 
     scoring_init(NO_DIR_SCORES, 10);
     check(scoring_persisted(), "a fresh init starts clean");
-    scoring_add_entry("ABC", 100);
+    scoring_add_entry("ABC", 100, 0, 0);
     check(!scoring_persisted(), "a save to a missing directory reports failure");
 
     scoring_init(SCORES, 10);
     check(scoring_persisted(), "a fresh init clears the previous failure");
-    scoring_add_entry("DEF", 200);
+    scoring_add_entry("DEF", 200, 0, 0);
     check(scoring_persisted(), "and a good save reports success again");
 
     cleanup();
@@ -131,9 +131,9 @@ static void test_scoring_single(void) {
     check(!scoring_is_high_score(0), "zero never qualifies");
     check(!scoring_is_high_score(-5), "negative never qualifies");
 
-    scoring_add_entry("AAA", 100);
-    scoring_add_entry("BBB", 300);
-    scoring_add_entry("CCC", 200);
+    scoring_add_entry("AAA", 100, 0, 0);
+    scoring_add_entry("BBB", 300, 0, 0);
+    scoring_add_entry("CCC", 200, 0, 0);
     check_int(scoring_get_count(), 3, "three entries");
     check_int(scoring_get_entry(0)->score, 300, "sorted descending");
     check_int(scoring_get_entry(1)->score, 200, "middle entry placed");
@@ -145,13 +145,13 @@ static void test_scoring_single(void) {
     check_int(scoring_get_rank(50), 4, "worst score ranks last");
 
     /* Fill past the cap. */
-    scoring_add_entry("DDD", 50);
-    scoring_add_entry("EEE", 25);
+    scoring_add_entry("DDD", 50, 0, 0);
+    scoring_add_entry("EEE", 25, 0, 0);
     check_int(scoring_get_count(), 5, "table fills to max_entries");
     check(!scoring_is_high_score(10), "full table rejects a low score");
     check(scoring_is_high_score(150), "full table accepts a qualifying score");
 
-    scoring_add_entry("FFF", 150);
+    scoring_add_entry("FFF", 150, 0, 0);
     check_int(scoring_get_count(), 5, "table does not grow past the cap");
     check_int(scoring_get_entry(2)->score, 150, "new entry lands in order");
     check_int(scoring_get_entry(4)->score, 50, "lowest entry was pushed off");
@@ -177,10 +177,10 @@ static void test_scoring_tables(void) {
     check_int(scoring_add_table("nibble"), nibble, "re-registering returns the same table");
 
     scoring_select_table(nibble);
-    scoring_add_entry("NIB", 15);
+    scoring_add_entry("NIB", 15, 0, 0);
     scoring_select_table(byte);
-    scoring_add_entry("BYT", 255);
-    scoring_add_entry("BY2", 200);
+    scoring_add_entry("BYT", 255, 0, 0);
+    scoring_add_entry("BY2", 200, 0, 0);
 
     scoring_select_table(nibble);
     check_int(scoring_get_count(), 1, "nibble table kept its own entries");
