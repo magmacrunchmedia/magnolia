@@ -3,7 +3,9 @@
 C game engine for Wii homebrew, built on devkitPPC + GRRLIB 4.6 + libogc. Version
 0.3.0 (the `VERSION` file is the source of truth). Games do not link a library —
 they compile magnolia's sources directly; the games live in sibling repos
-(moonlight-drift-wii, george-boole-wii, texas-holdem-lava-dome-wii). Apache-2.0.
+(moonlight-drift, george-boole, texas-holdem-lava-dome). Each of those holds
+every version of its game, with the magnolia port under `wii/`, so the engine
+resolves at `../../magnolia` from there rather than `../magnolia`. Apache-2.0.
 
 ## AI Attribution
 

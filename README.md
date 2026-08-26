@@ -260,9 +260,17 @@ sharply — and pass a lower rate or mono for a long music loop via
 
 ## Used by
 
-- [Moonlight Drift Wii](https://github.com/magmacrunchmedia/moonlight-drift-wii) — Jetman-style arcade game
-- [George Boole Wii](https://github.com/magmacrunchmedia/george-boole-wii) — Number puzzle with leaderboards
-- [Lava Dome Wii](https://github.com/magmacrunchmedia/lava-dome-wii) — Dice game
+Each game now lives in one repository holding every version of it. The Wii port
+built on magnolia is under `wii/`, beside the browser version it was ported
+from — so the reference implementation for a behaviour is in the same checkout
+as the port.
+
+- [moonlight-drift](https://github.com/magmacrunchmedia/moonlight-drift) — Jetman-style one-button cave flyer, 24 characters
+- [george-boole](https://github.com/magmacrunchmedia/george-boole) — logic-gate puzzle with per-mode leaderboards
+- [texas-holdem-lava-dome](https://github.com/magmacrunchmedia/texas-holdem-lava-dome) — solo Texas Hold'Em against a rising dome
+
+A game's Makefile expects magnolia checked out beside its repository, so the
+engine resolves at `../../magnolia` from inside the game's `wii/` folder.
 
 ## Dependencies
 
