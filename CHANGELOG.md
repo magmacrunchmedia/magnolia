@@ -148,8 +148,11 @@ hitboxes, movelists, round flow, a roster — stays in the game.
 - **Repaired `make test`**, which had not compiled since v0.3.0's
   "Add moves and highest_earned to ScoreEntry": that commit widened
   `scoring_add_entry()` to four arguments and updated no test. CI had been red
-  since. The call sites now pass the two new fields; asserting that they survive
-  a save/load round trip is still owed.
+  since. The call sites now pass the two new fields, and `test_storage` now
+  asserts what that commit never did: that `moves` and `highest_earned` survive
+  a save/load round trip, that a `scores.json` written without either key still
+  loads with both defaulting to 0, and that the fields follow their entry when a
+  new score displaces it in the sort.
 
 ## v0.2.0
 
