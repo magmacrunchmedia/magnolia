@@ -1,88 +1,52 @@
 #include <wiiuse/wpad.h>
 #include "input.h"
+#include "input_state.h"
 
-/* Roughly a third of a second before repeat starts, then about 7 a second: fast
-   enough to cross a long list, slow enough that a single press still selects
-   exactly one item. */
-static int repeat_delay    = 20;
-static int repeat_interval = 8;
+/* The hardware half: read WPAD, translate to the engine's button bits, hand the
+   frame to input_state.c. Everything that counts, compares or remembers lives
+   over there, where it can be tested without a console.
 
-/* Frames each direction has been held, and whether a repeat is already running
-   for it. Counted in input_scan() so a caller that polls a direction twice in a
-   frame gets the same answer both times. */
-static int held_frames[INPUT_DIR_COUNT];
-static int fired[INPUT_DIR_COUNT];
+   The mapping is one-to-one with what input.c did before the split, deliberately
+   -- three shipped games are calibrated against these exact directions, and a
+   "correction" here would silently rotate the D-pad under all of them. */
+static const u32 wpad_mask[INPUT_BTN_COUNT] = {
+    [INPUT_BTN_A]     = WPAD_BUTTON_A,
+    [INPUT_BTN_B]     = WPAD_BUTTON_B,
+    [INPUT_BTN_1]     = WPAD_BUTTON_1,
+    [INPUT_BTN_2]     = WPAD_BUTTON_2,
+    [INPUT_BTN_PLUS]  = WPAD_BUTTON_PLUS,
+    [INPUT_BTN_MINUS] = WPAD_BUTTON_MINUS,
+    [INPUT_BTN_HOME]  = WPAD_BUTTON_HOME,
+    [INPUT_BTN_UP]    = WPAD_BUTTON_UP,
+    [INPUT_BTN_DOWN]  = WPAD_BUTTON_DOWN,
+    [INPUT_BTN_LEFT]  = WPAD_BUTTON_LEFT,
+    [INPUT_BTN_RIGHT] = WPAD_BUTTON_RIGHT,
+};
 
-static u32 dir_mask(InputDir dir) {
-    switch (dir) {
-        case INPUT_DIR_UP:    return WPAD_BUTTON_UP;
-        case INPUT_DIR_DOWN:  return WPAD_BUTTON_DOWN;
-        case INPUT_DIR_LEFT:  return WPAD_BUTTON_LEFT;
-        case INPUT_DIR_RIGHT: return WPAD_BUTTON_RIGHT;
-        default:              return 0;
+static unsigned short translate(u32 wpad_held) {
+    unsigned short held = 0;
+    for (int b = 0; b < INPUT_BTN_COUNT; b++) {
+        if (wpad_held & wpad_mask[b]) held |= (unsigned short)(1u << (unsigned)b);
     }
+    return held;
 }
 
 void input_init(void) {
     WPAD_Init();
-    for (int i = 0; i < INPUT_DIR_COUNT; i++) {
-        held_frames[i] = 0;
-        fired[i] = 0;
-    }
+    input_state_reset();
 }
 
 int input_scan(void) {
     WPAD_ScanPads();
 
-    u32 held = WPAD_ButtonsHeld(0);
-    for (int i = 0; i < INPUT_DIR_COUNT; i++) {
-        if (held & dir_mask((InputDir)i)) {
-            held_frames[i]++;
-        } else {
-            held_frames[i] = 0;
-            fired[i] = 0;
-        }
+    /* Every channel is fed every frame, including the ones with nothing on them.
+       A controller that switches off mid-press is then reported as releasing
+       what it was holding, rather than leaving a button stuck down forever. */
+    for (int p = 0; p < INPUT_MAX_PLAYERS; p++) {
+        u32 type = 0;
+        int connected = (WPAD_Probe(p, &type) == WPAD_ERR_NONE);
+        input_state_feed(p, connected, connected ? translate(WPAD_ButtonsHeld(p)) : 0);
     }
+
     return 1;
-}
-
-static int pressed(u32 mask) {
-    return (WPAD_ButtonsDown(0) & mask) != 0;
-}
-
-int input_a_pressed(void)       { return pressed(WPAD_BUTTON_A); }
-int input_back_pressed(void)    { return pressed(WPAD_BUTTON_B); }
-int input_home_pressed(void)    { return pressed(WPAD_BUTTON_HOME); }
-int input_button1_pressed(void) { return pressed(WPAD_BUTTON_1); }
-int input_button2_pressed(void) { return pressed(WPAD_BUTTON_2); }
-int input_plus_pressed(void)    { return pressed(WPAD_BUTTON_PLUS); }
-int input_minus_pressed(void)   { return pressed(WPAD_BUTTON_MINUS); }
-
-int input_left_pressed(void)    { return pressed(WPAD_BUTTON_LEFT); }
-int input_right_pressed(void)   { return pressed(WPAD_BUTTON_RIGHT); }
-int input_up_pressed(void)      { return pressed(WPAD_BUTTON_UP); }
-int input_down_pressed(void)    { return pressed(WPAD_BUTTON_DOWN); }
-
-int input_a_held(void) {
-    return (WPAD_ButtonsHeld(0) & WPAD_BUTTON_A) != 0;
-}
-
-void input_set_repeat(int delay_frames, int interval_frames) {
-    if (delay_frames > 0)    repeat_delay = delay_frames;
-    if (interval_frames > 0) repeat_interval = interval_frames;
-}
-
-int input_dir_repeat(InputDir dir) {
-    if (dir < 0 || dir >= INPUT_DIR_COUNT) return 0;
-
-    int frames = held_frames[dir];
-    if (frames == 0) return 0;
-    if (frames == 1) return 1;                 /* the initial press */
-    if (frames < repeat_delay) return 0;
-
-    if (!fired[dir]) {
-        fired[dir] = 1;
-        return 1;
-    }
-    return ((frames - repeat_delay) % repeat_interval) == 0;
 }

@@ -162,10 +162,10 @@ make test   # runs the host tests; needs only a C compiler
 ```
 
 `make test` covers every engine module that is free of libogc — `prefs`,
-`scoring`, `menu`, `gamestate`, and `theme` — and runs each as its own binary
-(`make test-menu` and friends run one at a time). The source list per binary is
-written out in the Makefile rather than wildcarded; it is the record of which
-modules are host-clean.
+`scoring`, `menu`, `gamestate`, `theme`, `input_state` and `timestep` — and runs
+each as its own binary (`make test-menu` and friends run one at a time). The
+source list per binary is written out in the Makefile rather than wildcarded; it
+is the record of which modules are host-clean.
 
 **Storage** is where this started. Both `prefs` and `scoring` are about files,
 and an emulated SD card can report itself mounted while refusing every write —
@@ -182,6 +182,19 @@ window follows it, and every item stays reachable.
 **`gamestate`** reaches libogc only through `input.h`, so its test links
 `tests/fake_input.c` in place of `source/input.c` and drives the real state
 machine on the host.
+
+**`input_state`** is the half of `input` that counts rather than reads — press,
+hold and release edges, and auto-repeat, for each of up to four players. It was
+untestable while it sat one call below `WPAD_ButtonsHeld()`, which meant the only
+way to check that a second player had their own hold counters was to stand in
+front of a console with two controllers. `tests/fake_input.c` now feeds this real
+code rather than reimplementing it, so the presses the `gamestate` cases see are
+computed by the same lines the console runs.
+
+**`timestep`** is the accumulator behind `clock_fixed_steps()`. The claim worth
+asserting is that a second of real time buys the same number of logic steps
+however the frames it arrived in were shaped — sixty even ones, a hundred and
+twenty short ones, or ten long ones.
 
 **`theme`** is pure arithmetic guarded by `#ifdef GEKKO`, so it compiles on the
 host. The test checks HSL primaries, secondaries, complementaries, grey, black,
@@ -209,14 +222,14 @@ designed against one example usually fits only that example.
 |--------|--------|-------------|
 | **core** | `core.h` | `magnolia_init()` bring-up, init status, SD asset paths |
 | **renderer** | `renderer.h` | GRRLIB init, TTF font, real video-mode geometry, frame flush |
-| **sprite** | `sprite.h` | Texture load/free, draw-at-origin, uniform and per-axis scaled draw |
-| **input** | `input.h` | Wiimote buttons, D-pad, hold and auto-repeat |
+| **sprite** | `sprite.h` | Texture load/free, draw-at-origin, scaled draw, sprite sheets, mirroring |
+| **input** | `input.h` | Up to four Wiimotes: press/hold/release edges, per-frame snapshots, auto-repeat |
 | **audio** | `audio.h` | PCM music loop + SFX over ASND, mono/stereo, any rate |
 | **scoring** | `scoring.h` | High-score tables (one or many) with SD JSON persistence |
 | **prefs** | `prefs.h` | Persisted int key/value store for player preferences |
 | **gamestate** | `gamestate.h` | Score-attack shell, pre-run menu, pause, initials editor |
 | **menu** | `menu.h` | Grid/list cursor with wrapping and a scrolling window |
-| **clock** | `clock.h` | Frame counter, delta time, easing |
+| **clock** | `clock.h` | Frame counter, delta time, optional fixed timestep, easing |
 | **theme** | `theme.h` | HSL→RGB palette generator, complementary colours |
 | **ui_utils** | `ui_utils.h` | Design-space → TV-safe layout, text, panels, wrapping |
 
@@ -258,6 +271,80 @@ Keep short effects at 48kHz stereo — they are what the player hears most
 sharply — and pass a lower rate or mono for a long music loop via
 `audio_play_music_fmt()`. Trim rather than stream.
 
+### More than one player
+
+`input_scan()` samples every connected controller, and every query takes a player
+index: `input_pressed(1, INPUT_BTN_A)` is player two's A. Player one has a
+shorthand — `input_a_pressed()` and friends are the same calls with the index
+filled in — so a single-player game reads exactly as it did.
+
+Three things a two-player game needs that per-button accessors could not express:
+
+```c
+input_pressed(p, INPUT_BTN_A);      // the frame it went down
+input_held(p, INPUT_BTN_A);         // still down (blocking, walking, charging)
+input_released(p, INPUT_BTN_A);     // the frame it came up
+const InputPad *pad = input_snapshot(p);   // the whole frame, as a value
+```
+
+`input_snapshot()` is the one worth knowing about. A frame of input is a value
+you can copy and keep, which is what an input buffer is made of — a motion input
+is a pattern over roughly eight frames, and no amount of per-button accessors
+will describe one. The engine deliberately stops here: buffering frames and
+recognising patterns in them is a game's decision, not an engine's.
+
+### Sprite sheets
+
+A uniform grid of frames in one texture — cells of `frame_w` × `frame_h`, counted
+left-to-right then top-to-bottom. This is the format SPRITE//FORGE exports and
+all three MagmaCrunch engines read, so a sheet feeds adenosine, magnolia and
+texastoast alike; the canonical spec is `adenosine/packages/rpg/API.md`, and
+changing it is a three-repo change.
+
+```c
+SpriteSheet fighter;
+sprite_sheet_load(&fighter, "sd:/apps/game/fighter.png", 64, 96, 32, 96);
+sprite_sheet_draw(&fighter, frame, x, y);
+sprite_sheet_draw_ex(&fighter, frame, x, y, 1.0f, 1.0f, facing_left, tint);
+```
+
+The origin is the *frame's*, not the sheet's, and is stated at load time — where
+a character's feet are is a property of how the art was drawn, and re-deriving it
+per draw site is how two call sites end up disagreeing about where the ground is.
+Frame sizes that do not divide the image leave the sheet empty rather than
+drawing the plausible part of a mis-exported asset.
+
+Mirroring reflects a frame about its own origin: the origin's distance from the
+left edge becomes its distance from the right, so a character anchored at the
+front foot stays anchored there when they turn around. Reach for
+`sprite_sheet_draw_ex()` rather than `GRRLIB_BMFX_FlipH()` — that one builds a
+mirrored copy of the texture pixel by pixel, which is fine once at load time and
+ruinous once per frame per character.
+
+### Fixed timestep
+
+`clock_dt()` reports however long the last frame really took, which is right for
+anything continuous — a fade, a slide, a starfield. It is wrong for anything
+whose rules are written in frames. Run "three frames of startup, twelve of
+recovery" against a delta that varies with SD reads and the numbers stop meaning
+anything: a combo that worked on a clean frame drops on a busy one.
+
+The engine offers a fixed step and does not impose one. A game that never calls
+`clock_set_fixed_hz()` sees no change at all.
+
+```c
+clock_set_fixed_hz(60);
+...
+for (int i = 0; i < clock_fixed_steps(); i++) world_step(clock_fixed_dt());
+world_draw();                    // once, however many steps ran
+```
+
+Drawing stays outside the loop — stepping is how often the rules run, not how
+often the screen is painted. A frame that owes more than `TIMESTEP_MAX_STEPS` was
+a stall rather than a slow frame, and the backlog is dropped rather than repaid,
+because a game that sprints to catch up after a load is worse than one that lost
+the time.
+
 ## Used by
 
 Each game now lives in one repository holding every version of it. The Wii port
@@ -289,8 +376,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for code style, testing, and commit conve
 
 ## Font
 
-Includes **Press Start 2P** by [CodeMan38](https://fonts.google.com/specimen/Press+Start+2P), embedded as a C array via `raw2c`. Licensed under OFL 1.1.
+Includes **Press Start 2P** by [CodeMan38](https://fonts.google.com/specimen/Press+Start+2P), embedded as a C array via `raw2c`.
+
+Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with
+Reserved Font Name "Press Start 2P". Licensed under the SIL Open Font License
+1.1 — the full text is in [font/OFL.txt](font/OFL.txt). That notice also lives
+in the `.ttf`'s own name table, so it travels inside the embedded array and into
+any binary built from it.
 
 ## License
 
-Apache 2.0 — same as adenosine.
+Apache 2.0 — same as adenosine. The bundled font is the one exception: Press
+Start 2P stays under OFL 1.1, as above.

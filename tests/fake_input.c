@@ -1,52 +1,46 @@
 #include "fake_input.h"
 #include "input.h"
+#include "input_state.h"
 
-static int down[FAKE_BUTTON_COUNT];
+static const InputButton mapping[FAKE_BUTTON_COUNT] = {
+    [FAKE_A]      = INPUT_BTN_A,
+    [FAKE_B]      = INPUT_BTN_B,
+    [FAKE_HOME]   = INPUT_BTN_HOME,
+    [FAKE_1]      = INPUT_BTN_1,
+    [FAKE_2]      = INPUT_BTN_2,
+    [FAKE_PLUS]   = INPUT_BTN_PLUS,
+    [FAKE_MINUS]  = INPUT_BTN_MINUS,
+    [FAKE_UP]     = INPUT_BTN_UP,
+    [FAKE_DOWN]   = INPUT_BTN_DOWN,
+    [FAKE_LEFT]   = INPUT_BTN_LEFT,
+    [FAKE_RIGHT]  = INPUT_BTN_RIGHT,
+    [FAKE_A_HELD] = INPUT_BTN_A,
+};
+
+static unsigned short pending;
 
 void fake_input_clear(void) {
-    for (int i = 0; i < FAKE_BUTTON_COUNT; i++) down[i] = 0;
+    pending = 0;
+    input_state_reset();
 }
 
 void fake_input_press(FakeButton b) {
-    if (b >= 0 && b < FAKE_BUTTON_COUNT) down[b] = 1;
+    if (b < 0 || b >= FAKE_BUTTON_COUNT) return;
+    pending |= (unsigned short)(1u << (unsigned)mapping[b]);
+}
+
+void fake_input_commit(void) {
+    input_state_feed(0, 1, 0);
+    input_state_feed(0, 1, pending);
 }
 
 void fake_input_only(FakeButton b) {
-    fake_input_clear();
+    pending = 0;
     fake_input_press(b);
+    fake_input_commit();
 }
 
-/* --- the input.h surface, as gamestate.c sees it --- */
-
+/* The rest of the hardware surface, which gamestate.c never calls but a test
+   binary must still be able to link. */
 void input_init(void) { fake_input_clear(); }
 int  input_scan(void) { return 1; }
-
-int input_a_pressed(void)       { return down[FAKE_A]; }
-int input_back_pressed(void)    { return down[FAKE_B]; }
-int input_home_pressed(void)    { return down[FAKE_HOME]; }
-int input_button1_pressed(void) { return down[FAKE_1]; }
-int input_button2_pressed(void) { return down[FAKE_2]; }
-int input_plus_pressed(void)    { return down[FAKE_PLUS]; }
-int input_minus_pressed(void)   { return down[FAKE_MINUS]; }
-
-int input_left_pressed(void)    { return down[FAKE_LEFT]; }
-int input_right_pressed(void)   { return down[FAKE_RIGHT]; }
-int input_up_pressed(void)      { return down[FAKE_UP]; }
-int input_down_pressed(void)    { return down[FAKE_DOWN]; }
-
-int input_a_held(void)          { return down[FAKE_A_HELD] || down[FAKE_A]; }
-
-int input_dir_repeat(InputDir dir) {
-    switch (dir) {
-        case INPUT_DIR_UP:    return down[FAKE_UP];
-        case INPUT_DIR_DOWN:  return down[FAKE_DOWN];
-        case INPUT_DIR_LEFT:  return down[FAKE_LEFT];
-        case INPUT_DIR_RIGHT: return down[FAKE_RIGHT];
-        default:              return 0;
-    }
-}
-
-void input_set_repeat(int delay_frames, int interval_frames) {
-    (void)delay_frames;
-    (void)interval_frames;
-}

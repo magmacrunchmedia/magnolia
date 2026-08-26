@@ -1,6 +1,7 @@
 #include <gccore.h>
 #include <ogc/lwp_watchdog.h>
 #include "clock.h"
+#include "timestep.h"
 
 static int   frame = 0;
 static u64   last_ticks = 0;
@@ -12,6 +13,7 @@ void clock_reset(void) {
     last_ticks = gettime();
     dt = 0.0f;
     elapsed = 0.0f;
+    timestep_reset();
 }
 
 void clock_tick(void) {
@@ -33,11 +35,23 @@ void clock_tick(void) {
     last_ticks = now;
     elapsed += dt;
     frame++;
+
+    /* Fed the same clamped delta the rest of the engine sees, so a stalled frame
+       is one decision rather than two that could disagree. Costs nothing when no
+       game has asked for a fixed step. */
+    timestep_advance(dt);
 }
 
 int   clock_frame(void)   { return frame; }
 float clock_dt(void)      { return dt; }
 float clock_elapsed(void) { return elapsed; }
+
+/* Straight through to timestep.c, which is where the arithmetic lives so that it
+   can be tested without a console. */
+void  clock_set_fixed_hz(int hz) { timestep_set_hz(hz); }
+int   clock_fixed_hz(void)       { return timestep_hz(); }
+float clock_fixed_dt(void)       { return timestep_dt(); }
+int   clock_fixed_steps(void)    { return timestep_steps(); }
 
 static float clamp01(float t) {
     if (t < 0.0f) return 0.0f;

@@ -12,7 +12,7 @@
 #
 #   make          build libmagnolia.a
 #   make test     run all host-side tests (no devkitPPC, no console)
-#   make test-menu, test-gamestate, test-storage   run just one of them
+#   make test-menu, test-gamestate, test-input, ...   run just one of them
 #   make clean
 #---------------------------------------------------------------------------------
 
@@ -20,7 +20,7 @@
 # them would put them out of reach on the machine where they are most useful.
 # Named once, so the guard below and the rules further down cannot drift apart --
 # `make test-menu` on a laptop with no cross-compiler has to work too.
-HOST_TESTS := test-storage test-menu test-gamestate test-theme
+HOST_TESTS := test-storage test-menu test-gamestate test-theme test-input test-timestep
 
 ifeq ($(filter test $(HOST_TESTS),$(MAKECMDGOALS)),)
 ifeq ($(strip $(DEVKITPPC)),)
@@ -81,12 +81,29 @@ test-menu: | $(BUILD)
 	@$(BUILD)/$@
 
 # gamestate.c reaches libogc only through input.h, so the test binary links a
-# host stand-in for that header instead of source/input.c. The seam was already
-# there; nothing in the shipping code changes to make this possible.
+# host stand-in for the hardware half instead of source/input.c. The seam was
+# already there; nothing in the shipping code changes to make this possible.
+# input_state.c is the real thing -- the fake only says which buttons are down,
+# so the presses and repeats these cases see are computed by shipping code.
 test-gamestate: | $(BUILD)
 	@$(HOSTCC) $(HOSTCFLAGS) -o $(BUILD)/$@ \
 	    tests/test_gamestate.c tests/fake_input.c \
-	    source/gamestate.c source/scoring.c
+	    source/input_state.c source/gamestate.c source/scoring.c
+	@$(BUILD)/$@
+
+# The edge and auto-repeat arithmetic, split out of input.c so it could be
+# asserted rather than eyeballed on a console with two controllers in hand.
+test-input: | $(BUILD)
+	@$(HOSTCC) $(HOSTCFLAGS) -o $(BUILD)/$@ \
+	    tests/test_input.c source/input_state.c
+	@$(BUILD)/$@
+
+# The fixed-step accumulator. Whether a second of real time always buys the
+# same number of logic steps is an arithmetic claim, and this is where it can
+# be one -- clock.c itself cannot be built here, since it is a call to gettime().
+test-timestep: | $(BUILD)
+	@$(HOSTCC) $(HOSTCFLAGS) -o $(BUILD)/$@ \
+	    tests/test_timestep.c source/timestep.c
 	@$(BUILD)/$@
 
 # theme.c is nothing but arithmetic and was unreachable here only because its

@@ -21,7 +21,14 @@ source/                 the 12 engine modules, one .c/.h pair each:
                         core (boot order, SD paths), renderer (video, TTF font),
                         sprite, input, audio, scoring, prefs, gamestate, menu,
                         clock, theme, ui_utils
+                        plus two internal seams, which games do not include:
+                        input_state (edges/repeat, split from input.c) and
+                        timestep (fixed-step accumulator, split from clock.c).
+                        Both exist so the arithmetic can be host-tested; the
+                        public API stays on input.h and clock.h.
 font/                   Press Start 2P embedded as a C array (raw2c), OFL 1.1
+                        licence text in font/OFL.txt — the font is
+                        distributed here, so that file ships with it
 tests/                  host-side tests + harness.h + fake_input.c (input.h stand-in)
 template/               new-game skeleton: Makefile, meta.xml, source/
 tools/new-game.sh       stamps template/ out as ../<name> beside the engine
@@ -35,7 +42,8 @@ build/, libmagnolia.a   standalone-build outputs (generated)
 ```bash
 make          # build libmagnolia.a standalone; needs DEVKITPPC + DEVKITPRO set
 make test     # all host tests; needs only a host C compiler (HOSTCC ?= cc)
-make test-storage | test-menu | test-gamestate | test-theme   # one at a time
+make test-storage | test-menu | test-gamestate | test-theme | test-input
+make test-timestep                                            # one at a time
 make clean
 tools/new-game.sh my-game     # create ../my-game from template/
 ```
@@ -61,11 +69,20 @@ saves survive), `make wii WIILOAD=tcp:<wii-ip>` (run over network, card untouche
 - **No wildcards in the Makefile's test source lists.** The per-binary list is the
   record of which modules are host-clean. (The standalone build does wildcard.)
 - Host tests cover every libogc-free module: prefs, scoring, menu, gamestate,
-  theme. gamestate reaches libogc only through `input.h`, so its test links
-  `tests/fake_input.c` in place of `source/input.c`. theme compiles on the host
-  because its libogc use is guarded by `#ifdef GEKKO`.
+  theme, input_state, timestep. gamestate reaches libogc only through `input.h`,
+  so its test links `tests/fake_input.c` in place of `source/input.c` -- the fake
+  now only says which buttons are down, and the real `input_state.c` computes the
+  edges, so the tests exercise shipping code rather than a copy of it. theme
+  compiles on the host because its libogc use is guarded by `#ifdef GEKKO`.
 - Adding a host-clean module: add it to `HOST_TESTS`, write
   `tests/test_<module>.c` on the existing `harness.h`, verify `make test-<module>`.
+- Input is per-player: `input_scan()` samples every controller, and the queries
+  take a player index. The zero-argument spellings (`input_a_pressed()`) are
+  player 0, kept so the three shipped games compile unchanged -- do not remove
+  them, and add a wrapper whenever a new query is added.
+- `clock_dt()` is real elapsed time; `clock_fixed_steps()` is the optional fixed
+  step. Anything whose rules are written in frames should run on the latter. Both
+  exist because neither answer is right for every game.
 - **Design rule:** magnolia holds what more than one game needs. Sprite loading and
   the origin concept are engine; a character roster is not. One consumer means it
   stays in the game until a second appears.
@@ -94,8 +111,13 @@ magnolia (C/Wii), texastoast (Python) — so a sheet exported from SPRITE//FORGE
 (adenosine/tools/sprites.html) feeds all of them. Canonical spec:
 adenosine/packages/rpg/API.md. Changing the format is a three-repo change.
 
-Here the reader is `source/sprite.c`/`sprite.h`: texture load/free, draw-at-origin,
-uniform and per-axis scaled draw — the origin is taken at load time.
+Here the reader is `source/sprite.c`/`sprite.h`. `SpriteSheet` is the grid form:
+`sprite_sheet_load()` states the cell size and the per-frame origin, and frame
+sizes that do not divide the image leave the sheet empty rather than drawing a
+mis-exported asset. Frames go through GRRLIB's tile calls, which number tiles in
+the same order the shared format specifies. `sprite_sheet_draw_ex()` mirrors about
+the frame's own origin; do not reach for `GRRLIB_BMFX_FlipH()`, which copies the
+texture pixel by pixel and is ruinous once per frame.
 
 ## Debugging on Dolphin
 
