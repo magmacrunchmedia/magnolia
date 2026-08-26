@@ -236,6 +236,114 @@ static void test_scoring_compat(void) {
     check_int(scoring_get_count(), 2, "default table untouched by a new table");
 }
 
+/* moves and highest_earned, the two fields a ScoreEntry gained after the
+ * initials-and-score pair it started as. They are written by scoring_save() and
+ * read back by scoring_load(), so they are exactly the sort of thing that
+ * round-trips fine in memory and quietly comes back as zero off the card.
+ */
+static void test_scoring_extra_fields(void) {
+    printf("scoring: moves and highest_earned round-trip\n");
+    cleanup();
+
+    scoring_init(SCORES, 5);
+    scoring_add_entry("RUN", 400, 137, 2048);
+    scoring_add_entry("LOW", 100, 42, 256);
+
+    scoring_save();
+    check_int(scoring_load(), 2, "both entries load back");
+
+    check_str(scoring_get_entry(0)->initials, "RUN", "the top entry is the one it was");
+    check_int(scoring_get_entry(0)->score, 400, "and kept its score");
+    check_int(scoring_get_entry(0)->moves, 137, "moves survive the file");
+    check_int(scoring_get_entry(0)->highest_earned, 2048, "highest_earned survives the file");
+
+    check_str(scoring_get_entry(1)->initials, "LOW", "the second entry is the one it was");
+    check_int(scoring_get_entry(1)->moves, 42, "the second entry's moves are its own");
+    check_int(scoring_get_entry(1)->highest_earned, 256,
+              "the second entry's highest_earned is its own");
+
+    /* A fresh init is what a power cycle looks like. */
+    scoring_init(SCORES, 5);
+    check_int(scoring_get_entry(0)->moves, 137, "moves survive a reload");
+    check_int(scoring_get_entry(0)->highest_earned, 2048, "highest_earned survives a reload");
+}
+
+static void test_scoring_field_compat(void) {
+    printf("scoring: save files without the newer fields still load\n");
+    cleanup();
+
+    /* Exactly what a build before moves and highest_earned wrote. scoring.c
+       treats both keys as optional for this reason, and a card written by that
+       build is still sitting in players' consoles. */
+    FILE *f = fopen(SCORES, "w");
+    fprintf(f, "{\"scores\":[{\"initials\":\"OLD\",\"score\":420},"
+               "{\"initials\":\"TWO\",\"score\":99}]}");
+    fclose(f);
+
+    scoring_init(SCORES, 10);
+    check_int(scoring_get_count(), 2, "a file with neither key still loads");
+    check_int(scoring_get_entry(0)->score, 420, "old score intact");
+    check_int(scoring_get_entry(0)->moves, 0, "absent moves defaults to 0");
+    check_int(scoring_get_entry(0)->highest_earned, 0, "absent highest_earned defaults to 0");
+    check_int(scoring_get_entry(1)->score, 99, "second old score intact");
+    check_int(scoring_get_entry(1)->moves, 0, "absent moves defaults to 0 on every entry");
+    check_int(scoring_get_entry(1)->highest_earned, 0,
+              "absent highest_earned defaults to 0 on every entry");
+
+    /* Once a run is filed against the old table, the whole file is rewritten in
+       the current format -- the defaults must not stick to the old entries. */
+    scoring_add_entry("NEW", 500, 64, 1024);
+    scoring_init(SCORES, 10);
+    check_int(scoring_get_entry(0)->moves, 64, "the new entry's moves reached the card");
+    check_int(scoring_get_entry(0)->highest_earned, 1024,
+              "the new entry's highest_earned reached the card");
+    check_int(scoring_get_entry(1)->moves, 0, "the upgraded old entry still reads 0");
+}
+
+static void test_scoring_fields_follow_the_sort(void) {
+    printf("scoring: moves and highest_earned follow the sort\n");
+    cleanup();
+
+    scoring_init(SCORES, 3);
+    scoring_add_entry("TOP", 300, 30, 1024);
+    scoring_add_entry("BOT", 100, 10, 128);
+
+    /* Entries are held in score order, so an insertion in the middle shifts the
+       ones below it. Each field has to travel with the entry it belongs to. */
+    scoring_add_entry("MID", 200, 20, 512);
+
+    check_int(scoring_get_entry(0)->score, 300, "top entry stayed put");
+    check_int(scoring_get_entry(0)->moves, 30, "top entry kept its moves");
+    check_int(scoring_get_entry(0)->highest_earned, 1024, "top entry kept its highest_earned");
+
+    check_int(scoring_get_entry(1)->score, 200, "new entry landed in the middle");
+    check_int(scoring_get_entry(1)->moves, 20, "new entry brought its own moves");
+    check_int(scoring_get_entry(1)->highest_earned, 512,
+              "new entry brought its own highest_earned");
+
+    check_int(scoring_get_entry(2)->score, 100, "displaced entry moved down a rank");
+    check_int(scoring_get_entry(2)->moves, 10, "displaced entry kept its moves");
+    check_int(scoring_get_entry(2)->highest_earned, 128,
+              "displaced entry kept its highest_earned");
+
+    /* A full table, so this one pushes the lowest entry off the end. */
+    scoring_add_entry("WIN", 400, 40, 4096);
+    check_int(scoring_get_count(), 3, "table does not grow past the cap");
+    check_int(scoring_get_entry(0)->moves, 40, "the new leader carries its own moves");
+    check_int(scoring_get_entry(0)->highest_earned, 4096,
+              "the new leader carries its own highest_earned");
+    check_int(scoring_get_entry(2)->score, 200, "the lowest entry was pushed off");
+    check_int(scoring_get_entry(2)->moves, 20, "and the survivor shifted down with its moves");
+    check_int(scoring_get_entry(2)->highest_earned, 512,
+              "and with its highest_earned");
+
+    /* The reordering has to reach the card, not just the array. */
+    scoring_init(SCORES, 3);
+    check_int(scoring_get_entry(1)->moves, 30, "the sorted order reloads with its moves");
+    check_int(scoring_get_entry(2)->highest_earned, 512,
+              "and the shifted entry's highest_earned");
+}
+
 static void test_running_score(void) {
     printf("scoring: the run in progress\n");
     cleanup();
@@ -259,6 +367,9 @@ int main(void) {
     test_scoring_single();
     test_scoring_tables();
     test_scoring_compat();
+    test_scoring_extra_fields();
+    test_scoring_field_compat();
+    test_scoring_fields_follow_the_sort();
     test_running_score();
     cleanup();
 
