@@ -26,6 +26,12 @@ typedef struct {
    usable but degraded -- query the accessors below and tell the player, rather
    than silently rendering placeholder art. */
 int  magnolia_init(const MagnoliaConfig *cfg);
+
+/* Unmounts the card and shuts down video, in the reverse of the order
+   magnolia_init() brought them up. Call it last: the SD card is gone
+   afterwards, so anything still to be saved must be saved before this.
+   Audio is not touched -- a game that called audio_init() owns the matching
+   audio_shutdown(), since the engine never started it. */
 void magnolia_shutdown(void);
 
 int  magnolia_sd_mounted(void);
