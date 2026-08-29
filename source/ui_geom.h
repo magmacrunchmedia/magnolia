@@ -83,15 +83,14 @@ typedef int (*UiMeasureFn)(const char *text, unsigned int design_size, void *ctx
  * Breaks on spaces, honours an explicit newline (which ends the line so far,
  * empty or not), and never splits a word.
  *
- * Two behaviours worth knowing rather than discovering: a word too long for the
- * column overflows it rather than being broken, and a word too long for `out`
- * is dropped entirely. Both are what ui_utils has always done. They are pinned
- * by the tests rather than corrected here -- three shipped games lay their text
- * out through this function, and changing where it breaks is a change to their
- * screens, not a refactor of them.
+ * A word too wide for the column overflows it rather than being split -- that is
+ * deliberate, and three shipped games lay text out expecting it. A word too long
+ * for `out` is the one case that cannot overflow, since there is nowhere to hold
+ * it, so it is broken across lines at the buffer's length. Every character still
+ * reaches the screen; only the seam is arbitrary.
  *
- * `out` should be UI_WRAP_MAX bytes. A shorter buffer only lowers the length at
- * which a word is dropped. */
+ * `out` should be UI_WRAP_MAX bytes, and must be at least 2. A shorter buffer
+ * only lowers the length at which a word starts being broken. */
 const char *ui_geom_wrap_next(const char *text, char *out, int out_n,
                               int design_w, unsigned int design_size,
                               UiMeasureFn measure, void *ctx);

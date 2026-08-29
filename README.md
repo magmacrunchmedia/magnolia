@@ -211,6 +211,12 @@ text without the font, so it is handed a measurer, the way `input_state` is
 handed the buttons rather than reading the hardware. The test passes a monospace
 one, which is not a simplification — Press Start 2P is a monospaced pixel font.
 
+A word wider than its column overflows rather than being split, which is
+deliberate and which two games' screens are laid out around. A word too long for
+the line buffer is the one case that cannot overflow, since there is nowhere to
+hold it, so it is broken across lines instead — it used to disappear, which made
+the buffer size visible on screen in the one way it should never be.
+
 CI runs both of these on every push; see `.github/workflows/ci.yml`. The host
 tests need only a C compiler, so they run on a GitHub-hosted runner. The
 standalone `make` runs in devkitPro's own container on a GitHub-hosted runner

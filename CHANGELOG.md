@@ -91,6 +91,12 @@ that a game with two players in front of it needs.
   calling the font directly, the same seam `input_state` uses for buttons.
   The port was checked against the old implementation over 1540 text/width/size
   combinations before landing: identical output in every one.
+- **A word too long for the line buffer is broken, not dropped** — over about
+  128 characters it used to vanish outright, nothing drawn and nothing said,
+  while a word merely too wide for the *column* has always been allowed to run
+  over. The cliff between overflowing and disappearing was the size of a buffer
+  nobody looking at the screen can see. Checked against the old behaviour over
+  the same 1540 combinations: only the over-long cases changed.
 - **A wrapped paragraph beginning with a newline** no longer draws uninitialised
   memory. `ui_draw_text_wrapped` left its line buffer unterminated, and text
   opening with a newline reached the draw call before anything was written to it.
