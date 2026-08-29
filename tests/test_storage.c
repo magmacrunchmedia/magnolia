@@ -17,9 +17,21 @@
 static const char *PREFS  = "/tmp/magnolia_test_prefs.json";
 static const char *SCORES = "/tmp/magnolia_test_scores.json";
 
+/* scoring_init() probes the card by writing beside the score file and removing
+   it again; the tests watch that it cleans up after itself. */
+static const char *PROBE = "/tmp/magnolia_test_scores.json.probe";
+
+static int file_exists(const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) return 0;
+    fclose(f);
+    return 1;
+}
+
 static void cleanup(void) {
     unlink(PREFS);
     unlink(SCORES);
+    unlink(PROBE);
     unlink("/tmp/magnolia_test_scores-nibble.json");
     unlink("/tmp/magnolia_test_scores-byte.json");
     unlink("/tmp/magnolia_test_scores-gauntlet.json");
@@ -101,13 +113,20 @@ static void test_persistence_reporting(void) {
        every power cycle looked exactly like one nobody had qualified for. */
     cleanup();
     scoring_init(SCORES, 10);
-    check(scoring_persisted(), "nothing has failed before the first save");
+    check(scoring_persisted(), "a fresh card reports saving, with no entry filed");
 
     scoring_add_entry("ABC", 100, 0, 0);
     check(scoring_persisted(), "a save to a good path reports success");
 
+    /* The probe is the whole point of this pair. scoring_init() used to answer
+       1 here -- nothing had failed yet -- and went on answering 1 for as long as
+       the player went without setting a score. That is precisely the window in
+       which a game would want to warn them the run will not be kept, and it was
+       the window in which this reported all was well. prefs has probed since the
+       app-directory bug; the README's return-code table claimed both did. */
     scoring_init(NO_DIR_SCORES, 10);
-    check(scoring_persisted(), "a fresh init starts clean");
+    check(!scoring_persisted(),
+          "an unwritable path says so from init, not from the first save");
     scoring_add_entry("ABC", 100, 0, 0);
     check(!scoring_persisted(), "a save to a missing directory reports failure");
 
@@ -115,6 +134,10 @@ static void test_persistence_reporting(void) {
     check(scoring_persisted(), "a fresh init clears the previous failure");
     scoring_add_entry("DEF", 200, 0, 0);
     check(scoring_persisted(), "and a good save reports success again");
+
+    /* The probe writes a real file, so it has to take it away again -- an engine
+       that litters the app directory once per boot is its own bug report. */
+    check(!file_exists(PROBE), "the probe removes its own file");
 
     cleanup();
 }
@@ -300,6 +323,38 @@ static void test_scoring_field_compat(void) {
     check_int(scoring_get_entry(1)->moves, 0, "the upgraded old entry still reads 0");
 }
 
+/* The parser searches forward for "moves" and "highest_earned" from the score it
+   has just read. strstr does not stop at the end of a record, so before this was
+   bounded, a record lacking those keys found the next record's and reported them
+   as its own. The current writer always emits both, so no file it produces can
+   show this -- but a card written by an older build can, and that is exactly the
+   file the optional-key handling exists for. */
+static void test_scoring_fields_stay_in_their_record(void) {
+    printf("scoring: a record without the newer fields borrows nobody's\n");
+    cleanup();
+
+    /* First record old-style, second record current-style. The old one sits
+       directly before a perfectly good pair of numbers that are not its own. */
+    FILE *f = fopen(SCORES, "w");
+    fprintf(f, "{\"scores\":[{\"initials\":\"OLD\",\"score\":900},"
+               "{\"initials\":\"NEW\",\"score\":500,"
+               "\"moves\":77,\"highest_earned\":2048}]}");
+    fclose(f);
+
+    scoring_init(SCORES, 10);
+    check_int(scoring_get_count(), 2, "both records load");
+    check_str(scoring_get_entry(0)->initials, "OLD", "first record is the old one");
+    check_int(scoring_get_entry(0)->moves, 0,
+              "the old record reads 0 moves, not the next record's 77");
+    check_int(scoring_get_entry(0)->highest_earned, 0,
+              "the old record reads 0 highest_earned, not the next record's 2048");
+    check_int(scoring_get_entry(1)->moves, 77, "the newer record keeps its own moves");
+    check_int(scoring_get_entry(1)->highest_earned, 2048,
+              "the newer record keeps its own highest_earned");
+
+    cleanup();
+}
+
 static void test_scoring_fields_follow_the_sort(void) {
     printf("scoring: moves and highest_earned follow the sort\n");
     cleanup();
@@ -369,6 +424,7 @@ int main(void) {
     test_scoring_compat();
     test_scoring_extra_fields();
     test_scoring_field_compat();
+    test_scoring_fields_stay_in_their_record();
     test_scoring_fields_follow_the_sort();
     test_running_score();
     cleanup();

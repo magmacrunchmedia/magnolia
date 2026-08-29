@@ -50,6 +50,44 @@ static void derive_path(const char *id, char *out, size_t n) {
 
 static void load_table(int index);
 
+/* Probe the card with a real write.
+ *
+ * Without this, scoring_persisted() answers 1 -- nothing has failed yet -- right
+ * up until the first score is saved. On a card that refuses every write, that is
+ * exactly the stretch of play during which a game would want to tell the player
+ * their run is not going to be kept, and it is the stretch during which this
+ * said everything was fine. prefs has probed since the app-directory bug; the
+ * return-code table in the README has claimed all along that both do.
+ *
+ * It deliberately does not probe by calling scoring_save(), which is how prefs
+ * does it. A settings file is rebuilt in full from memory, so rewriting it at
+ * boot costs nothing. A score file is not: when the load read fewer entries than
+ * the file holds -- a short read, a truncation, a hand edit -- saving that back
+ * would delete the rest in order to answer a question about the card. So the
+ * probe writes its own file beside the real one and removes it again.
+ */
+static void probe_card(void) {
+    char probe[176];
+    FILE *f;
+    int ok;
+
+    /* No path is not a card that refuses writes, but it is not one that accepts
+       them either, and saying so beats claiming a save that cannot happen. */
+    if (!base_path[0]) { persisted = 0; return; }
+
+    snprintf(probe, sizeof(probe), "%s.probe", base_path);
+    f = fopen(probe, "w");
+    if (!f) { persisted = 0; return; }
+
+    /* A card can hand back a FILE* and still refuse the bytes, so the write and
+       the close are both part of the question. */
+    ok = fputc('.', f) != EOF;
+    if (fclose(f) != 0) ok = 0;
+
+    persisted = ok;
+    remove(probe);
+}
+
 void scoring_init(const char *path, int max_entries) {
     if (path) {
         strncpy(base_path, path, sizeof(base_path) - 1);
@@ -59,14 +97,16 @@ void scoring_init(const char *path, int max_entries) {
                ? max_entries : MAGNOLIA_MAX_SCORES;
 
     memset(tables, 0, sizeof(tables));
-    /* A fresh init is a fresh start: a failure recorded against the previous
-       path says nothing about this one. */
-    persisted = 1;
     table_count = 1;
     current = 0;
     tables[0].id[0] = '\0';
     snprintf(tables[0].path, sizeof(tables[0].path), "%s", base_path);
     load_table(0);
+
+    /* Last, so the answer is about this path rather than the previous one: a
+       fresh init is a fresh start, and a failure recorded against a card that
+       is no longer the one in the slot says nothing about the one that is. */
+    probe_card();
 }
 
 int scoring_add_table(const char *id) {
@@ -203,9 +243,22 @@ int scoring_load(void) {
         t->count = 0;
         return 0;
     }
-    fread(buf, 1, size, f);
-    buf[size] = '\0';
+    size_t got = fread(buf, 1, (size_t)size, f);
     fclose(f);
+    /* A short read means the file is not the one it described itself as.
+       The bytes past `got` are whatever malloc last left in that block, and
+       the parser below would walk straight into them -- the terminator goes
+       at the length the file claimed, not the length that arrived. audio.c
+       has always checked this; these two never did. An empty table beats a
+       half-parsed one: the entries that did arrive would be written back over
+       the ones that did not on the next save, and a leaderboard silently losing
+       its tail is harder to notice than one that failed to load. */
+    if (got != (size_t)size) {
+        free(buf);
+        t->count = 0;
+        return 0;
+    }
+    buf[size] = '\0';
 
     t->count = 0;
     char *p = buf;
@@ -213,7 +266,7 @@ int scoring_load(void) {
     while ((p = strstr(p, "\"initials\":")) != NULL && t->count < max_scores) {
         if (p + 11 >= end) break;
         p += 11;
-        while (*p == '"' && p < end) p++;
+        while (p < end && *p == '"') p++;
         int len = 0;
         while (p + len < end && p[len] != '"' && len < 3) len++;
         if (len > 0 && len <= 3) {
@@ -232,19 +285,26 @@ int scoring_load(void) {
             break;
         }
 
-        /* Optional fields -- absent in older score files, default to 0. */
+        /* Optional fields -- absent in older score files, default to 0.
+           Bounded to this record. strstr runs forward to the end of the buffer,
+           so a record lacking these would find the *next* record's and report a
+           neighbour's numbers as its own. Nothing the current writer emits can
+           produce that -- it always writes both -- but an older save, a hand
+           edit, or a file from a build predating these fields can, and showing
+           someone else's move count is worse than showing none. */
+        char *next = strstr(p, "\"initials\":");
+        char *rec_end = next ? next : end;
+
         t->entries[t->count].moves = 0;
         t->entries[t->count].highest_earned = 0;
 
         char *m = strstr(p, "\"moves\":");
-        if (m && m < end) {
-            m += 8;
-            t->entries[t->count].moves = atoi(m);
+        if (m && m + 8 < rec_end) {
+            t->entries[t->count].moves = atoi(m + 8);
         }
         char *h = strstr(p, "\"highest_earned\":");
-        if (h && h < end) {
-            h += 17;
-            t->entries[t->count].highest_earned = atoi(h);
+        if (h && h + 17 < rec_end) {
+            t->entries[t->count].highest_earned = atoi(h + 17);
         }
 
         t->count++;
