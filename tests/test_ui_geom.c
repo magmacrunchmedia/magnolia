@@ -223,11 +223,18 @@ static void test_wrap_newlines(void) {
     check_str(lines[0], "", "which is empty");
 }
 
-/* Two behaviours that are not obviously right, pinned so that changing either is
-   a decision someone makes on purpose. Three shipped games lay their text out
-   through this function; where it breaks is part of their screens. */
+/* Total occurrences of `ch` across every line settled, for asking the one
+   question that matters about a broken word: did all of it arrive. */
+static int char_total(char ch) {
+    int n = 0;
+    for (int i = 0; i < line_count; i++)
+        for (const char *p = lines[i]; *p; p++)
+            if (*p == ch) n++;
+    return n;
+}
+
 static void test_wrap_pinned_quirks(void) {
-    printf("ui_geom: the awkward cases, as they have always behaved\n");
+    printf("ui_geom: words that do not fit\n");
 
     /* A word wider than the column runs over rather than being split. Breaking
        words mid-glyph would need hyphenation rules nobody has asked for. */
@@ -242,22 +249,40 @@ static void test_wrap_pinned_quirks(void) {
     check_str(lines[0], "hi", "the short word keeps its line");
     check_str(lines[1], "supercalifragilistic", "the long one follows");
 
-    /* A word too long for the line buffer is dropped outright. This is the one
-       genuinely questionable behaviour here: nothing is drawn and nothing says
-       so. It is left alone because correcting it changes what two games render,
-       which is a change to make deliberately and not inside a refactor. */
+    /* A word too long for the line buffer is broken across lines. It used to be
+       dropped -- nothing drawn, nothing said -- which was the odd one out: a
+       word merely too wide for the column has always been allowed to run over.
+       The cliff between overflowing and vanishing was the size of a buffer
+       nobody looking at the screen can see. */
     static char huge[UI_WRAP_MAX + 40];
-    memset(huge, 'x', sizeof(huge) - 1);
-    huge[sizeof(huge) - 1] = '\0';
+    const int huge_len = (int)sizeof(huge) - 1;
+    memset(huge, 'x', (size_t)huge_len);
+    huge[huge_len] = '\0';
 
     wrap_all(huge, 100000, 1);
-    check_int(line_count, 0, "a word longer than the line buffer is dropped, not truncated");
+    check_int(line_count, 2, "a word longer than the line buffer is broken, not dropped");
+    check_int((int)strlen(lines[0]), UI_WRAP_MAX - 1, "the first piece fills the buffer");
+    check_int((int)strlen(lines[1]), huge_len - (UI_WRAP_MAX - 1), "the rest follows on the next line");
+
+    /* The claim the fix is actually making. Where the seam falls is arbitrary;
+       that nothing falls out is not. */
+    check_int(char_total('x'), huge_len, "every character of the word reaches a line");
 
     static char around[UI_WRAP_MAX + 80];
     snprintf(around, sizeof(around), "before %s after", huge);
     wrap_all(around, 100000, 1);
-    check_int(line_count, 1, "the words around it still make a line");
-    check_str(lines[0], "before after", "with the over-long word simply absent");
+    check_int(char_total('x'), huge_len, "and still does with words either side of it");
+    check_str(lines[0], "before", "the word before it keeps its own line");
+    check(line_count >= 2 && strstr(lines[line_count - 1], "after") != NULL,
+          "the word after it is still drawn, on the last line");
+
+    /* A buffer with room for one character and a terminator still makes
+       progress rather than looping forever on a word it can never hold. */
+    char tiny[2];
+    const char *src = "abc";
+    const char *p = ui_geom_wrap_next(src, tiny, (int)sizeof(tiny), 100000, 1, mono, NULL);
+    check(p == src + 1, "a two-byte buffer advances by exactly one character");
+    check_str(tiny, "a", "and carries that character");
 }
 
 static void test_wrap_arguments(void) {
@@ -270,6 +295,8 @@ static void test_wrap_arguments(void) {
           "nowhere to put the line is no lines");
     check(ui_geom_wrap_next("hello", buf, 0, 100, 10, mono, NULL) == NULL,
           "a zero-length buffer is no lines");
+    check(ui_geom_wrap_next("hello", buf, 1, 100, 10, mono, NULL) == NULL,
+          "a buffer with room only for the terminator is no lines either");
     check(ui_geom_wrap_next("hello", buf, (int)sizeof(buf), 100, 10, NULL, NULL) == NULL,
           "no measurer is no lines, rather than a null call");
 

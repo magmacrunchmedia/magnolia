@@ -56,7 +56,10 @@ int ui_geom_to_design_w(const UiGeom *g, unsigned int screen_w) {
 const char *ui_geom_wrap_next(const char *text, char *out, int out_n,
                               int design_w, unsigned int design_size,
                               UiMeasureFn measure, void *ctx) {
-    if (!text || !out || out_n <= 0 || !measure) return NULL;
+    /* Two bytes is the smallest buffer that can hold a character and terminate
+       it. One byte could hold only the terminator, which is not a line, and it
+       would leave the long-word break below with nothing to advance by. */
+    if (!text || !out || out_n < 2 || !measure) return NULL;
 
     out[0] = '\0';
     int out_len = 0;
@@ -67,9 +70,31 @@ const char *ui_geom_wrap_next(const char *text, char *out, int out_n,
         while (*end && *end != ' ' && *end != '\n') end++;
 
         int wlen = (int)(end - word);
-        /* A word with nowhere to go is skipped rather than broken. Splitting one
-           would be a different function; breaking the buffer would be a bug. */
-        if (wlen > 0 && wlen < out_n) {
+
+        /* A word too long for the buffer is broken across lines rather than
+           dropped.
+           It used to be skipped outright: nothing drawn, nothing said, the text
+           simply absent. That was the odd one out, because a word merely too
+           wide for the *column* has always been allowed to run over -- so a
+           hundred-character word overflowed visibly and a hundred-and-thirty
+           character word vanished, and the cliff between them was the size of a
+           buffer nobody drawing the screen can see.
+           Breaking keeps every character on screen, which is the behaviour the
+           overflow case already promises. The break lands at the buffer's
+           length rather than at anything the reader can see coming, but a seam
+           in a word that long is easier to explain than its absence. */
+        if (wlen >= out_n) {
+            /* Finish the line in hand first, and resume at the word itself --
+               the same handover the column-overflow case makes below. */
+            if (out_len > 0) return word;
+
+            int chunk = out_n - 1;
+            memcpy(out, word, (size_t)chunk);
+            out[chunk] = '\0';
+            return word + chunk;
+        }
+
+        if (wlen > 0) {
             char candidate[UI_WRAP_MAX];
             if (out_len > 0) {
                 snprintf(candidate, sizeof(candidate), "%.*s %.*s",
