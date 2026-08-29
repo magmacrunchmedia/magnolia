@@ -5,10 +5,11 @@
 # dev box is off, and the whole argument for having them is that they are
 # reachable from anywhere. Tying them to one machine would undo that.
 #
-# Only the devkitPPC build genuinely needs the self-hosted runner, and it is
-# commented out below until its label has been confirmed -- a job queued against
-# a label no runner offers waits forever rather than failing, which is a worse
-# outcome than not having the job.
+# The devkitPPC build needs a cross-compiler, which is the whole reason it sat
+# unrun for so long: it was taken to need a self-hosted runner, and a job queued
+# against a label no runner offers waits forever rather than failing. It does not
+# -- devkitPro publish the toolchain as a container, so this runs on a
+# GitHub-hosted runner too and neither job depends on a particular machine.
 
 name: CI
 
@@ -32,20 +33,41 @@ jobs:
       - name: make test
         run: make test
 
-  # Uncomment once the runner's label is confirmed. It needs devkitPPC; the
-  # Makefile errors out by design without DEVKITPRO and DEVKITPPC set.
+  # The engine's other half -- renderer, sprite, audio, core, input, ui_utils --
+  # is bound to GRRLIB and libogc, so it has no host tests and, until this job,
+  # no automated check of any kind. This build is what stands in for them: it
+  # compiles the engine with no game directory on the include path, so a change
+  # that breaks the console build, or that reaches back into a game header,
+  # fails here rather than in the next game months later.
   #
-  # engine-build:
-  #   name: standalone engine build
-  #   runs-on: self-hosted
-  #   env:
-  #     DEVKITPRO: /opt/devkitpro
-  #     DEVKITPPC: /opt/devkitpro/devkitPPC
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     # Builds the engine with no game on the include path. If engine code ever
-  #     # reaches back into a game header, this fails here rather than the
-  #     # coupling being discovered by the next game months later.
-  #     - name: make
-  #       run: make
+  # It was held back waiting on a self-hosted runner, which turned out not to be
+  # necessary -- devkitPro publish the toolchain as a container that runs on a
+  # GitHub-hosted one. DEVKITPRO and DEVKITPPC come from the image's own
+  # environment; setting them here would only invite a hardcoded path to drift
+  # away from wherever the image actually puts the toolchain.
+  engine-build:
+    name: standalone engine build
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitppc:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # GRRLIB is not a dkp-pacman package -- it is built from source and
+      # installed into the portlibs tree. Its own dependencies (freetype, libpng,
+      # libjpeg-turbo) arrive with the image's ppc-portlibs and wii-portlibs
+      # groups, so nothing else needs installing.
+      #
+      # Pinned rather than tracking master: an unpinned dependency means GRRLIB
+      # can turn this repo's CI red on a day nobody touched this repo. v4.6.1 is
+      # the current 4.6, which is the version the README's dependency table names.
+      #
+      # The install lands in $DEVKITPRO/portlibs/wii -- GRRLIB's Makefile takes
+      # PORTLIBS_PATH from devkitPPC's wii_rules -- which is the directory the
+      # engine Makefile already has on its include path.
+      - name: install GRRLIB
+        run: |
+          git clone --depth 1 --branch v4.6.1 https://github.com/GRRLIB/GRRLIB.git /tmp/grrlib
+          make -C /tmp/grrlib/GRRLIB clean all install
+
+      - name: make
+        run: make

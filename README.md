@@ -200,7 +200,12 @@ twenty short ones, or ten long ones.
 host. The test checks HSL primaries, secondaries, complementaries, grey, black,
 white, wrap-around, and `theme_generate()` ranges over 2000 palettes.
 
-CI runs the host tests on every push; see `.github/workflows/ci.yml`.
+CI runs both of these on every push; see `.github/workflows/ci.yml`. The host
+tests need only a C compiler, so they run on a GitHub-hosted runner. The
+standalone `make` runs in devkitPro's own container on a GitHub-hosted runner
+too, with GRRLIB built from source into the portlibs tree -- it is the only
+automated check `renderer`, `sprite`, `audio`, `core`, `input` and `ui_utils`
+get, since none of them can be reached without libogc.
 
 Games can be driven without a controller: see the `AUTOSTART_GAMEPLAY` and
 `DEBUG_HEARTBEAT_FRAMES` hooks in the generated `config.h`. For `printf` to reach

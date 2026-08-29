@@ -34,7 +34,9 @@ template/               new-game skeleton: Makefile, meta.xml, source/
 tools/new-game.sh       stamps template/ out as ../<name> beside the engine
 Makefile                standalone libmagnolia.a build + host test targets
 build/, libmagnolia.a   standalone-build outputs (generated)
-.github/workflows/ci.yml  runs the host tests on every push
+.github/workflows/ci.yml  on every push: the host tests, and the standalone
+                        engine build in devkitPro's container -- the only
+                        automated check the libogc-bound modules get
 ```
 
 ## Commands
@@ -65,7 +67,9 @@ saves survive), `make wii WIILOAD=tcp:<wii-ip>` (run over network, card untouche
 
 ## Conventions
 
-- C99, `-Wall -Wextra`, warning-clean. If the compiler complains, fix it.
+- C99, `-Wall -Wextra`, warning-clean. The host tests add `-Werror`, so a warning
+  there fails CI; the cross build does not, because a devkitPPC bump can raise
+  warnings in third-party headers. If the compiler complains, fix it.
 - **No wildcards in the Makefile's test source lists.** The per-binary list is the
   record of which modules are host-clean. (The standalone build does wildcard.)
 - Host tests cover every libogc-free module: prefs, scoring, menu, gamestate,

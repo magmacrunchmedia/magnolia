@@ -56,7 +56,18 @@ that a game with two players in front of it needs.
 - **Host-side test suite** — `prefs`, `scoring`, `menu`, `gamestate`, and `theme` run on
   any machine with a C compiler. No devkitPPC, no console, no emulator.
 - **CI on every push** — GitHub Actions runs the host tests on a GitHub-hosted
-  runner. The standalone engine build is reserved for the self-hosted runner on MC1.
+  runner.
+- **The console build runs in CI too** — the standalone `make` now runs in
+  devkitPro's own container, with GRRLIB built from source, on a GitHub-hosted
+  runner. It had been held for a self-hosted machine that turned out not to be
+  needed. This is the only automated check `renderer`, `sprite`, `audio`, `core`,
+  `input` and `ui_utils` get: over half the engine is bound to libogc and cannot
+  be host-tested, so until now nothing but a local `make` stood between a broken
+  console build and the next game to pick the engine up.
+- **`-Werror` on the host tests** — CONTRIBUTING already asked for warning-clean
+  builds; now CI enforces it rather than trusting it. The cross build keeps plain
+  `-Wall -Wextra`, since a toolchain bump can raise warnings inside third-party
+  headers and that should not stop the build.
 - **`make test-theme`** — HSL primaries, secondaries, complementaries, grey, black,
   white, wrap-around, and `theme_generate()` range checks over 2000 palettes.
 
