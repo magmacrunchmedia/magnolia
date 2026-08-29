@@ -66,7 +66,13 @@ all: $(TARGET)
 # record of which engine modules are host-clean -- a wildcard would cheerfully
 # try to link renderer.c and fail with something far less informative.
 HOSTCC     ?= cc
-HOSTCFLAGS := -Wall -Wextra -I source -I tests
+# -Werror because CONTRIBUTING already requires warning-clean builds, and
+# without it that rule is honour-system: CI stays green on a new warning and
+# nobody finds out until the warnings are too many to read. Only the host
+# tests get it. The cross build is left alone deliberately -- a devkitPPC
+# bump can introduce warnings inside third-party headers, and stopping the
+# console build over someone else's header is a different trade.
+HOSTCFLAGS := -Wall -Wextra -Werror -I source -I tests
 
 test: $(HOST_TESTS)
 
