@@ -24,7 +24,7 @@ jobs:
     name: host tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # prefs, scoring, menu and gamestate: every engine module that is free of
       # libogc. Storage is the reason this exists -- an emulated SD card can
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     container: devkitpro/devkitppc:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # GRRLIB is not a dkp-pacman package -- it is built from source and
       # installed into the portlibs tree. Its own dependencies (freetype, libpng,
