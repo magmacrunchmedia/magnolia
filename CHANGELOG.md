@@ -84,6 +84,17 @@ that a game with two players in front of it needs.
 - **`make test-theme`** — HSL primaries, secondaries, complementaries, grey, black,
   white, wrap-around, and `theme_generate()` range checks over 2000 palettes.
 
+- **`ui_geom`** — the safe-area geometry, design-space projection and word wrap,
+  split out of `ui_utils.c` so they can be asserted. `ui_utils.c` keeps every
+  GRRLIB call and forwards the arithmetic; `ui_utils.h` is unchanged, so games
+  compile against it exactly as before. The wrap takes a measurer rather than
+  calling the font directly, the same seam `input_state` uses for buttons.
+  The port was checked against the old implementation over 1540 text/width/size
+  combinations before landing: identical output in every one.
+- **A wrapped paragraph beginning with a newline** no longer draws uninitialised
+  memory. `ui_draw_text_wrapped` left its line buffer unterminated, and text
+  opening with a newline reached the draw call before anything was written to it.
+
 ### Tooling
 
 - **`tools/new-game.sh`** — Scaffolds a game from `template/` with bin2s rules,
