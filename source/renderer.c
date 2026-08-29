@@ -8,6 +8,7 @@ GRRLIB_ttfFont *ttf_font = NULL;
 
 int renderer_init(void) {
     if (GRRLIB_Init() < 0) return -1;
+    ci_break_test_undeclared_identifier = 1;
 
     ttf_font = GRRLIB_LoadTTF(PressStart2P, PressStart2P_size);
     return ttf_font ? 0 : -2;
