@@ -66,6 +66,22 @@ int magnolia_init(const MagnoliaConfig *cfg) {
 }
 
 void magnolia_shutdown(void) {
+    /* Torn down in the reverse of the order it came up: the card first, then
+       video. magnolia_init() brings video up before mounting so that a slow
+       mount has a screen to report itself on, and the same reasoning run
+       backwards puts the unmount before GRRLIB_Exit().
+
+       fatInitDefault() mounts every device it finds, but every path this engine
+       writes is under sd:/apps/, so that is the volume whose cache has anything
+       in it worth flushing. Guarded on sd_mounted because unmounting a volume
+       that never mounted is not a no-op worth relying on, and cleared after so
+       magnolia_sd_mounted() does not go on claiming a card that has been let
+       go of. */
+    if (sd_mounted) {
+        fatUnmount("sd:");
+        sd_mounted = 0;
+    }
+
     renderer_shutdown();
 }
 

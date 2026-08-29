@@ -14,6 +14,13 @@ that a game with two players in front of it needs.
 - **magnolia_init() reorders boot** — video comes up before `fatInitDefault()`, so a
   slow or wedged SD mount shows a splash screen instead of a blank framebuffer.
   Adds `renderer_splash()` for status frames during bring-up.
+- **The card is unmounted on the way out** — `magnolia_init()` mounted it and
+  nothing ever let go, in the engine or in any of the three games. Teardown now
+  mirrors bring-up: the card first, then video, the reverse of the order they
+  came up in. Whether libfat was holding anything back is not something that can
+  be settled off-hardware, which is much of the reason to close the pair rather
+  than reason about it — silent unwritten saves are a failure this engine has
+  already been caught by twice.
 - **App directory auto-created** — `magnolia_init()` creates `sd:/apps/<app_name>/`
   before anything tries to persist into it. Without this, `fopen(..., "w")` fails
   when the parent is missing, and libfat does not create one implicitly.
