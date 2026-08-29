@@ -63,8 +63,16 @@ const ScoreEntry *scoring_get_entry(int index);
    not about a leaderboard. Lets a game tell the player their scores are not
    being kept, rather than appearing to forget them at random; the same question
    prefs_persisted() answers for preferences, and the same failure, since a card
-   can report itself mounted and still refuse every write. 1 before anything has
-   been saved, because nothing has failed yet. */
+   can report itself mounted and still refuse every write.
+
+   scoring_init() probes with a real write, so this answers for the card in the
+   slot from boot rather than from whenever a run first qualifies -- a player can
+   be several minutes in before anything is filed, and that is the stretch worth
+   warning them about. The probe writes its own file beside the score file and
+   removes it again rather than re-saving the table, as prefs_init() does with
+   settings: a settings file is rebuilt in full from memory, but a score file
+   that read short or was hand-edited holds entries the table does not, and
+   writing it back to test the card would be the one thing that loses them. */
 int  scoring_persisted(void);
 
 #endif

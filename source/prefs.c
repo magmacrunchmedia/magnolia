@@ -94,9 +94,21 @@ int prefs_load(void) {
         fclose(f);
         return 0;
     }
-    fread(buf, 1, size, f);
-    buf[size] = '\0';
+    size_t got = fread(buf, 1, (size_t)size, f);
     fclose(f);
+    /* A short read means the file is not the one it described itself as.
+       The bytes past `got` are whatever malloc last left in that block, and
+       the parser below would walk straight into them -- the terminator goes
+       at the length the file claimed, not the length that arrived. audio.c
+       has always checked this; these two never did. Falling back to nothing
+       is what the comment below already says a half-read file should do:
+       defaults, not values assembled out of whatever happened to parse. */
+    if (got != (size_t)size) {
+        free(buf);
+        pref_count = 0;
+        return 0;
+    }
+    buf[size] = '\0';
 
     /* Walks "key":value pairs. Anything malformed ends the parse rather than
        being guessed at -- a half-read preferences file should fall back to

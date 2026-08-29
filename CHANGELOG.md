@@ -20,6 +20,19 @@ that a game with two players in front of it needs.
 - **Save diagnostics** — `prefs_persisted()` and `scoring_persisted()` report whether
   the last save reached the card. `magnolia_init()` probes with a real write, so
   the answer is valid from boot.
+- **scoring actually probes** — the line above was only ever true of `prefs`.
+  `scoring_init()` loaded and left the flag optimistic, so `scoring_persisted()`
+  reported a healthy card until the first qualifying run — the whole stretch of
+  play a game would want to warn the player about. It now probes too, writing
+  beside the score file and removing it again rather than re-saving the table.
+- **A short read is a failed read** — `prefs` and `scoring` both ignored `fread`'s
+  return and terminated the buffer at the length the file *claimed*, leaving the
+  parser to walk whatever `malloc` last left there. `audio` had always checked.
+- **Score fields stay in their own record** — the optional `moves` and
+  `highest_earned` keys were found with an unbounded `strstr`, so a record
+  lacking them took the next record's numbers. Only reachable from a save written
+  before those fields existed, which is precisely the file the optional handling
+  is for.
 
 ### New modules
 
