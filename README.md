@@ -162,7 +162,8 @@ make test   # runs the host tests; needs only a C compiler
 ```
 
 `make test` covers every engine module that is free of libogc — `prefs`,
-`scoring`, `menu`, `gamestate`, `theme`, `input_state` and `timestep` — and runs
+`scoring`, `menu`, `gamestate`, `theme`, `input_state`, `timestep` and
+`ui_geom` — and runs
 each as its own binary (`make test-menu` and friends run one at a time). The
 source list per binary is written out in the Makefile rather than wildcarded; it
 is the record of which modules are host-clean.
@@ -199,6 +200,16 @@ twenty short ones, or ten long ones.
 **`theme`** is pure arithmetic guarded by `#ifdef GEKKO`, so it compiles on the
 host. The test checks HSL primaries, secondaries, complementaries, grey, black,
 white, wrap-around, and `theme_generate()` ranges over 2000 palettes.
+
+**`ui_geom`** is the arithmetic behind `ui_utils`: the TV-safe rectangle, the
+projection of the design space onto it, and the word wrap. It was unreachable
+here only because it shared a file with the GRRLIB calls, which meant the way to
+find out where a layout landed was to cross-compile it and look at a television —
+a poor way to learn that PAL is 528 lines tall rather than 480. The tests state
+both video modes outright. The wrap is the part worth having: it cannot measure
+text without the font, so it is handed a measurer, the way `input_state` is
+handed the buttons rather than reading the hardware. The test passes a monospace
+one, which is not a simplification — Press Start 2P is a monospaced pixel font.
 
 CI runs both of these on every push; see `.github/workflows/ci.yml`. The host
 tests need only a C compiler, so they run on a GitHub-hosted runner. The

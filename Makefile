@@ -20,7 +20,7 @@
 # them would put them out of reach on the machine where they are most useful.
 # Named once, so the guard below and the rules further down cannot drift apart --
 # `make test-menu` on a laptop with no cross-compiler has to work too.
-HOST_TESTS := test-storage test-menu test-gamestate test-theme test-input test-timestep
+HOST_TESTS := test-storage test-menu test-gamestate test-theme test-input test-timestep \n              test-ui-geom
 
 ifeq ($(filter test $(HOST_TESTS),$(MAKECMDGOALS)),)
 ifeq ($(strip $(DEVKITPPC)),)
@@ -110,6 +110,14 @@ test-input: | $(BUILD)
 test-timestep: | $(BUILD)
 	@$(HOSTCC) $(HOSTCFLAGS) -o $(BUILD)/$@ \
 	    tests/test_timestep.c source/timestep.c
+	@$(BUILD)/$@
+
+# The safe-area geometry, the design-space projection and the word wrap, split
+# out of ui_utils.c so they could be asserted. The rest of that file is GRRLIB
+# calls; this half decides where every glyph lands, including on the video mode
+# most games are never run against.
+test-ui-geom: | $(BUILD)
+	@$(HOSTCC) $(HOSTCFLAGS) -o $(BUILD)/$@ 	    tests/test_ui_geom.c source/ui_geom.c
 	@$(BUILD)/$@
 
 # theme.c is nothing but arithmetic and was unreachable here only because its

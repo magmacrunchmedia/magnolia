@@ -21,11 +21,15 @@ source/                 the 12 engine modules, one .c/.h pair each:
                         core (boot order, SD paths), renderer (video, TTF font),
                         sprite, input, audio, scoring, prefs, gamestate, menu,
                         clock, theme, ui_utils
-                        plus two internal seams, which games do not include:
-                        input_state (edges/repeat, split from input.c) and
-                        timestep (fixed-step accumulator, split from clock.c).
-                        Both exist so the arithmetic can be host-tested; the
-                        public API stays on input.h and clock.h.
+                        plus three internal seams, which games do not call:
+                        input_state (edges/repeat, split from input.c),
+                        timestep (fixed-step accumulator, split from clock.c) and
+                        ui_geom (safe area, design-space projection and word
+                        wrap, split from ui_utils.c). All three exist so the
+                        arithmetic can be host-tested; the public API stays on
+                        input.h, clock.h and ui_utils.h. ui_utils.h does include
+                        ui_geom.h, for UI_DESIGN_WIDTH/HEIGHT -- the constants
+                        live beside the code that divides by them.
 font/                   Press Start 2P embedded as a C array (raw2c), OFL 1.1
                         licence text in font/OFL.txt — the font is
                         distributed here, so that file ships with it
@@ -45,7 +49,7 @@ build/, libmagnolia.a   standalone-build outputs (generated)
 make          # build libmagnolia.a standalone; needs DEVKITPPC + DEVKITPRO set
 make test     # all host tests; needs only a host C compiler (HOSTCC ?= cc)
 make test-storage | test-menu | test-gamestate | test-theme | test-input
-make test-timestep                                            # one at a time
+make test-timestep | test-ui-geom                             # one at a time
 make clean
 tools/new-game.sh my-game     # create ../my-game from template/
 ```
@@ -73,7 +77,7 @@ saves survive), `make wii WIILOAD=tcp:<wii-ip>` (run over network, card untouche
 - **No wildcards in the Makefile's test source lists.** The per-binary list is the
   record of which modules are host-clean. (The standalone build does wildcard.)
 - Host tests cover every libogc-free module: prefs, scoring, menu, gamestate,
-  theme, input_state, timestep. gamestate reaches libogc only through `input.h`,
+  theme, input_state, timestep, ui_geom. gamestate reaches libogc only through `input.h`,
   so its test links `tests/fake_input.c` in place of `source/input.c` -- the fake
   now only says which buttons are down, and the real `input_state.c` computes the
   edges, so the tests exercise shipping code rather than a copy of it. theme

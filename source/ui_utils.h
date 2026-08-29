@@ -3,12 +3,17 @@
 
 #include <grrlib.h>
 
+#include "ui_geom.h"
+
 /* Screens are authored against a fixed 640x480 design space. At draw time those
    coordinates are mapped into the TV-safe rectangle of whatever video mode is
    actually running (NTSC 640x480, PAL 640x528), so a layout does not have to know
-   which console it is on or how much of the picture the TV eats. */
-#define UI_DESIGN_WIDTH   640
-#define UI_DESIGN_HEIGHT  480
+   which console it is on or how much of the picture the TV eats.
+
+   UI_DESIGN_WIDTH and UI_DESIGN_HEIGHT come from ui_geom.h, which holds the
+   projection arithmetic and is included here so games see them exactly where
+   they always did. Everything in this header still draws; everything in that one
+   only computes, which is what lets the host tests reach it. */
 
 /* Percent of each edge assumed lost to overscan. Consumer CRTs typically clip
    5-10%; 6 keeps text clear without wasting much screen. */
