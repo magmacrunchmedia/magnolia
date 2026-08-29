@@ -35,11 +35,16 @@ that a game with two players in front of it needs.
 - **A short read is a failed read** — `prefs` and `scoring` both ignored `fread`'s
   return and terminated the buffer at the length the file *claimed*, leaving the
   parser to walk whatever `malloc` last left there. `audio` had always checked.
-- **Score fields stay in their own record** — the optional `moves` and
-  `highest_earned` keys were found with an unbounded `strstr`, so a record
-  lacking them took the next record's numbers. Only reachable from a save written
-  before those fields existed, which is precisely the file the optional handling
-  is for.
+- **`ScoreEntry` is back to who and how well** — `moves` and `highest_earned`
+  were added to it during this cycle and are removed again before the release.
+  They were one game's statistics: a puzzle's move count and its best merged
+  tile. They travelled through the engine's struct, its public API, its save
+  format and its tests, and not one site ever read them back — write-only from
+  end to end. `scoring_add_entry()` takes initials and a score again.
+  Cards written while the keys existed still load; the parser skips them rather
+  than migrating, and the next save rewrites the file without them. A game that
+  wants to keep more about a run than this is where that mechanism should be
+  designed, against what it actually puts on screen.
 
 ### New modules
 
@@ -196,11 +201,11 @@ hitboxes, movelists, round flow, a roster — stays in the game.
 - **Repaired `make test`**, which had not compiled since v0.3.0's
   "Add moves and highest_earned to ScoreEntry": that commit widened
   `scoring_add_entry()` to four arguments and updated no test. CI had been red
-  since. The call sites now pass the two new fields, and `test_storage` now
-  asserts what that commit never did: that `moves` and `highest_earned` survive
-  a save/load round trip, that a `scores.json` written without either key still
-  loads with both defaulting to 0, and that the fields follow their entry when a
-  new score displaces it in the sort.
+  since. The call sites were repaired and the round trip asserted. Those two
+  fields have since been removed again — see above — so what `test_storage`
+  carries forward from that work is the case that outlived them: a card written
+  with keys this build no longer emits still loads, and its scores do not
+  absorb the retired values.
 
 ## v0.2.0
 

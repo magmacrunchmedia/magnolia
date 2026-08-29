@@ -31,7 +31,7 @@ void gamestate_begin_initials(GameStateMachine *g) {
 
 void gamestate_commit_initials(GameStateMachine *g, int score) {
     g->initials[g->cursor_pos] = (char)('A' + g->selected_letter);
-    scoring_add_entry(g->initials, score, g->moves, g->highest_earned);
+    scoring_add_entry(g->initials, score);
     g->state = GS_HIGH_SCORES;
 }
 
