@@ -138,8 +138,7 @@ int  scoring_get(void)       { return current_score; }
 void scoring_add(int points) { current_score += points; }
 void scoring_increment(void) { scoring_add(1); }
 
-int scoring_add_entry(const char *initials, int score, int moves,
-                      int highest_earned) {
+int scoring_add_entry(const char *initials, int score) {
     ScoreTable *t = tbl();
     if (score <= 0) return -1;
 
@@ -162,8 +161,6 @@ int scoring_add_entry(const char *initials, int score, int moves,
     strncpy(t->entries[rank].initials, initials, 3);
     t->entries[rank].initials[3] = '\0';
     t->entries[rank].score = score;
-    t->entries[rank].moves = moves;
-    t->entries[rank].highest_earned = highest_earned;
 
     if (t->count < max_scores) t->count++;
 
@@ -199,10 +196,8 @@ void scoring_save(void) {
     int count = t->count < max_scores ? t->count : max_scores;
     for (int i = 0; i < count; i++) {
         if (i > 0) fprintf(f, ",");
-        fprintf(f, "{\"initials\":\"%s\",\"score\":%d,\"moves\":%d,"
-                "\"highest_earned\":%d}",
-                t->entries[i].initials, t->entries[i].score,
-                t->entries[i].moves, t->entries[i].highest_earned);
+        fprintf(f, "{\"initials\":\"%s\",\"score\":%d}",
+                t->entries[i].initials, t->entries[i].score);
     }
     fprintf(f, "]}");
     fclose(f);
@@ -285,27 +280,10 @@ int scoring_load(void) {
             break;
         }
 
-        /* Optional fields -- absent in older score files, default to 0.
-           Bounded to this record. strstr runs forward to the end of the buffer,
-           so a record lacking these would find the *next* record's and report a
-           neighbour's numbers as its own. Nothing the current writer emits can
-           produce that -- it always writes both -- but an older save, a hand
-           edit, or a file from a build predating these fields can, and showing
-           someone else's move count is worse than showing none. */
-        char *next = strstr(p, "\"initials\":");
-        char *rec_end = next ? next : end;
-
-        t->entries[t->count].moves = 0;
-        t->entries[t->count].highest_earned = 0;
-
-        char *m = strstr(p, "\"moves\":");
-        if (m && m + 8 < rec_end) {
-            t->entries[t->count].moves = atoi(m + 8);
-        }
-        char *h = strstr(p, "\"highest_earned\":");
-        if (h && h + 17 < rec_end) {
-            t->entries[t->count].highest_earned = atoi(h + 17);
-        }
+        /* Anything else in the record is skipped: the loop simply looks for the
+           next "initials". Cards written by builds that stored a move count and
+           a best-merged-tile beside each score still load -- those keys are read
+           by nothing now, so they are passed over rather than migrated. */
 
         t->count++;
     }

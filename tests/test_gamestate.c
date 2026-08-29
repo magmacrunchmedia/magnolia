@@ -139,9 +139,9 @@ static void test_run_ends_not_qualifying(void) {
     printf("gamestate: a run that does not make the table\n");
     fresh_table(3);
 
-    scoring_add_entry("ZZZ", 900, 0, 0);
-    scoring_add_entry("YYY", 800, 0, 0);
-    scoring_add_entry("XXX", 700, 0, 0);
+    scoring_add_entry("ZZZ", 900);
+    scoring_add_entry("YYY", 800);
+    scoring_add_entry("XXX", 700);
 
     GameStateMachine g;
     gamestate_init(&g);
