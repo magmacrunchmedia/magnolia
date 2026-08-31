@@ -374,9 +374,9 @@ built on magnolia is under `wii/`, beside the browser version it was ported
 from — so the reference implementation for a behaviour is in the same checkout
 as the port.
 
-- [moonlight-drift](https://github.com/magmacrunchmedia/moonlight-drift) — Jetman-style one-button cave flyer, 24 characters
-- [george-boole](https://github.com/magmacrunchmedia/george-boole) — logic-gate puzzle with per-mode leaderboards
-- [texas-holdem-lava-dome](https://github.com/magmacrunchmedia/texas-holdem-lava-dome) — solo Texas Hold'Em against a rising dome
+- [moonlight-drift](https://github.com/magmacrunch-media/moonlight-drift) — Jetman-style one-button cave flyer, 24 characters
+- [george-boole](https://github.com/magmacrunch-media/george-boole) — logic-gate puzzle with per-mode leaderboards
+- [texas-holdem-lava-dome](https://github.com/magmacrunch-media/texas-holdem-lava-dome) — solo Texas Hold'Em against a rising dome
 
 A game's Makefile expects magnolia checked out beside its repository, so the
 engine resolves at `../../magnolia` from inside the game's `wii/` folder.
